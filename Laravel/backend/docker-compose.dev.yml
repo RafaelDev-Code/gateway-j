@@ -1,0 +1,47 @@
+## docker-compose.dev.yml
+## Override para desenvolvimento local
+## Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+
+  nginx:
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - /etc/nginx/certs:/etc/nginx/certs  # certs autoassinados locais
+
+  octane:
+    build:
+      target: base   # imagem base sem otimizacoes de producao
+    command: php artisan octane:start --server=swoole --host=0.0.0.0 --port=8000 --watch
+    volumes:
+      - .:/var/www/html
+
+  horizon:
+    build:
+      target: base
+    volumes:
+      - .:/var/www/html
+
+  scheduler:
+    build:
+      target: base
+    volumes:
+      - .:/var/www/html
+
+  # Telescope apenas em dev
+  telescope:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: base
+    container_name: gateway_telescope
+    command: php artisan serve --host=0.0.0.0 --port=8001
+    env_file: .env
+    volumes:
+      - .:/var/www/html
+    ports:
+      - "8001:8001"
+    networks:
+      - gateway_internal

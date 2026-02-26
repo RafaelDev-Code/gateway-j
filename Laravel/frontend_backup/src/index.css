@@ -1,0 +1,581 @@
+@import "tailwindcss";
+
+/* ===== Identidade visual: respeito, sofisticação, futurista ===== */
+:root {
+  --color-accent: #f30f22;
+  --color-accent-hover: #ff1a2e;
+  --color-accent-glow: rgba(243, 15, 34, 0.35);
+  --color-bg-dark: #060102;
+  --color-bg-elevated: #0D0204;
+  --color-bg-card: #0A0103;
+  --color-red-highlight: rgba(243, 15, 34, 0.08);
+  --color-red-strong: rgba(243, 15, 34, 0.15);
+  --color-white-glow: rgba(255, 255, 255, 0.04);
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-border-accent: rgba(243, 15, 34, 0.25);
+  --color-text: #ffffff;
+  --color-text-muted: rgba(255, 255, 255, 0.7);
+  --font-body: "Inter", "Lato", Arial, sans-serif;
+  --font-heading: "Lato", "Inter", Arial, sans-serif;
+  --blur-panel: 12px;
+  --blur-bg: 80px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg-dark);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Chuvisco de qualidade: grain fino e uniforme (film grain) */
+.layout-bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='5' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.9' intercept='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+  opacity: 0.12;
+}
+
+/* Chuvisco nos menus: mesma qualidade, mais presença para pegar no vidro */
+.glass-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='5' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.9' intercept='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+  opacity: 0.15;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Painéis com blur (glass) */
+.glass-panel {
+  background: rgba(13, 2, 2, 0.6);
+  backdrop-filter: blur(var(--blur-panel));
+  -webkit-backdrop-filter: blur(var(--blur-panel));
+  border: 1px solid var(--color-border);
+}
+
+/* Títulos com Lato para sofisticação */
+h1, h2, h3, .font-heading {
+  font-family: var(--font-heading);
+}
+
+.recharts-default-tooltip {
+  background: var(--color-bg-elevated) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4) !important;
+  color: var(--color-text) !important;
+}
+
+.sidebar-finexy { background: #F0F0F0; border-right: 1px solid #e5e5e5; }
+.sidebar-item-ativo { background: #3f3f46; color: #fff; border-radius: 50%; }
+.sidebar-finexy button:not(.sidebar-item-ativo):hover { background: #e0e0e0; color: #374151; }
+.card-branco { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); border: 1px solid #eee; }
+.dashboard-grid-finexy { display: grid; width: 100%; max-width: 100%; min-width: 0; grid-template-columns: minmax(300px, 360px) 1fr; grid-auto-rows: minmax(min-content, auto); grid-template-areas: "saldo resumos" "saldo grafico" "carteiras grafico" "limite grafico" "cartoes atividades" "cartoes atividades"; gap: 20px; align-items: start; }
+.conteudo-main { margin-left: 0; }
+/* Padding responsivo do conteúdo principal (layout Vorix) */
+.conteudo-main { padding: 24px !important; }
+@media (max-width: 768px) { .conteudo-main { padding: 16px !important; } }
+@media (max-width: 480px) { .conteudo-main { padding: 12px !important; } }
+/* Animação do backdrop do menu overlay */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* TopBar responsiva */
+.topbar-vorix { padding-left: 24px; padding-right: 24px; }
+@media (max-width: 768px) { .topbar-vorix { padding-left: 16px; padding-right: 16px; } }
+@media (max-width: 480px) { .topbar-vorix { padding-left: 12px; padding-right: 12px; } }
+@media (max-width: 1200px) { .dashboard-grid-finexy { grid-template-columns: 1fr; grid-template-areas: "saldo" "resumos" "grafico" "carteiras" "limite" "cartoes" "atividades"; } }
+@media (max-width: 768px) {
+  .dashboard-grid-finexy { gap: 14px; }
+  .dashboard-resumos { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 480px) {
+  .dashboard-grid-finexy { gap: 12px; }
+}
+/* Dashboard: títulos e ações responsivos */
+.dashboard-title { font-size: 26px !important; }
+.dashboard-subtitle { font-size: 14px !important; }
+@media (max-width: 768px) {
+  .dashboard-title { font-size: 22px !important; }
+  .dashboard-subtitle { font-size: 13px !important; }
+}
+@media (max-width: 480px) {
+  .dashboard-title { font-size: 20px !important; }
+  .dashboard-subtitle { font-size: 12px !important; }
+}
+.dashboard-saldo-actions { flex-wrap: wrap; }
+@media (max-width: 380px) {
+  .dashboard-saldo-actions button { min-width: 100%; }
+}
+.pattern-stripes { fill: var(--color-accent); }
+.sidebar-raven .sidebar-item:hover { background: #1a1a1a !important; border-color: #262626 !important; }
+.sidebar-raven .sidebar-btn-add:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.sidebar-raven .sidebar-automacoes:hover { color: #fff !important; }
+.sidebar-raven .sidebar-footer-btn:hover { background: #1a1a1a !important; }
+.sidebar-raven .sidebar-sair:hover { background: rgba(174, 219, 47, 0.12) !important; }
+.sidebar-vorix-item:hover { background: rgba(255, 255, 255, 0.06) !important; color: var(--color-text) !important; }
+
+/* ===== Dashboard: cards com chuvisco + vidro + blur ===== */
+.card-futurist {
+  position: relative;
+  background: rgba(12, 2, 3, 0.28);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 20px;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.35s ease, border-color 0.35s ease, backdrop-filter 0.35s ease, background 0.35s ease;
+  animation: cardEnter 0.55s cubic-bezier(0.25, 0.1, 0.25, 1) backwards;
+  overflow: hidden;
+}
+/* Chuvisco em cima do card — mesma textura do fundo para não ficar sem graça */
+.card-futurist::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='5' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.9' intercept='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+  opacity: 0.14;
+  pointer-events: none;
+}
+.card-futurist:hover {
+  background: rgba(16, 3, 4, 0.34);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: translateY(-2px);
+}
+.card-futurist > * {
+  position: relative;
+  z-index: 1;
+}
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-futurist-inner {
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 12px 14px;
+  box-shadow: none;
+  transition: background 0.22s ease, border-color 0.22s ease, backdrop-filter 0.22s ease;
+  overflow: hidden;
+}
+.card-futurist-inner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='5' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.9' intercept='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 160px 160px;
+  opacity: 0.12;
+  pointer-events: none;
+}
+.card-futurist-inner > * {
+  position: relative;
+  z-index: 1;
+}
+.card-futurist-inner:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ===== Botões do sistema: glass + chuvisco + padrão do dashboard ===== */
+.btn-futurist {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease;
+  outline: none;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+.btn-futurist:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+.btn-futurist:active {
+  transform: translateY(0);
+}
+/* Par Efetuar Saque + Depositar: mesma borda, flat (sem 3D) */
+.btn-futurist-primary,
+.btn-futurist-outline {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+.btn-futurist-primary:hover,
+.btn-futurist-outline:hover {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important;
+  transform: translateY(-1px);
+}
+.btn-futurist-primary > *,
+.btn-futurist-outline > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Primário: vermelho chapado (sem gradiente 3D) */
+.btn-futurist-primary {
+  background: #c41220 !important;
+  color: #fff !important;
+}
+.btn-futurist-primary:hover {
+  background: #d41624 !important;
+}
+
+/* Secundário: fundo neutro, mesma borda */
+.btn-futurist-outline {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff !important;
+}
+.btn-futurist-outline::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='5' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 140px 140px;
+  opacity: 0.05;
+  pointer-events: none;
+}
+.btn-futurist-outline:hover {
+  background: rgba(255, 255, 255, 0.09) !important;
+}
+
+.card-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 8px 0;
+  padding-bottom: 0;
+  width: fit-content;
+  font-family: var(--font-heading);
+  position: relative;
+}
+.card-section-title::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -8px;
+  width: 100%;
+  height: 1px;
+  background: var(--color-border-accent);
+}
+
+/* Ícone (i) informativo: pequeno, alinhado, hover suave */
+.btn-info-inline {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  cursor: pointer;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.btn-info-inline:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  transform: scale(1.12);
+}
+.btn-info-inline:active {
+  transform: scale(1);
+}
+.btn-info-inline svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Gráfico Atividade de Pagamentos: sem borda de foco ao clicar */
+.payment-activity-chart:focus,
+.payment-activity-chart *:focus {
+  outline: none !important;
+}
+
+/* Barras Formas de conversão: track e fill mais modernos */
+.conversion-bar-track {
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.conversion-bar-track:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.conversion-bar-fill {
+  transition: width 0.8s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.35s ease;
+}
+.conversion-bar-track:hover .conversion-bar-fill {
+  box-shadow: 0 0 16px rgba(243, 15, 34, 0.35);
+}
+
+.table-row-futurist {
+  transition: background 0.15s ease;
+}
+.table-row-futurist:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dashboard-page {
+  animation: pageEnter 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) ease-out both;
+}
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Menu lateral: mesmo padrão do dashboard (flat, mesma borda, sem 3D) ===== */
+.sidebar-menu-btn {
+  position: relative;
+  overflow: hidden;
+  transition: background 0.3s ease, color 0.3s ease, transform 0.28s cubic-bezier(0.25, 0.1, 0.25, 1), border-color 0.3s ease, backdrop-filter 0.3s ease;
+  outline: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+.sidebar-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+  transform: translateX(2px);
+}
+.sidebar-menu-btn:focus-visible {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+/* Ativo: vermelho chapado, mesma borda do dashboard, sem 3D */
+.sidebar-menu-btn.sidebar-menu-btn-active {
+  background: #c41220 !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+.sidebar-menu-btn.sidebar-menu-btn-active:hover {
+  background: #d41624 !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important;
+  transform: translateX(2px);
+}
+.sidebar-menu-btn.sidebar-menu-btn-active svg,
+.sidebar-menu-btn.sidebar-menu-btn-active .sidebar-menu-icon,
+.sidebar-menu-btn.sidebar-menu-btn-active span {
+  color: #fff !important;
+}
+.sidebar-menu-btn > * {
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar-submenu-btn {
+  position: relative;
+  overflow: hidden;
+  transition: background 0.3s ease, color 0.3s ease, transform 0.28s cubic-bezier(0.25, 0.1, 0.25, 1), border-color 0.3s ease, backdrop-filter 0.3s ease;
+  outline: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.sidebar-submenu-btn:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #fff !important;
+  transform: translateX(2px);
+}
+/* Submenu ativo: vermelho accent (botão continua vermelho) */
+.sidebar-submenu-btn.sidebar-submenu-btn-active {
+  background: var(--color-accent, #c41220) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: none !important;
+}
+.sidebar-submenu-btn.sidebar-submenu-btn-active:hover {
+  background: #d41624 !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: none !important;
+}
+.sidebar-submenu-btn > * {
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar-toggle-btn {
+  position: relative;
+  overflow: hidden;
+  transition: background 0.22s ease, color 0.22s ease, transform 0.2s ease, border-color 0.22s ease, backdrop-filter 0.22s ease;
+  outline: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+.sidebar-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #fff !important;
+  transform: translateX(2px);
+}
+
+/* ── Sidebar Vorix: design system + UX profissional ───────────── */
+.sb-user-block {
+  /* sem background próprio — herda o blur do aside */
+}
+
+.sb-section-header {
+  transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
+  outline: none;
+  border-radius: 8px;
+}
+.sb-section-header:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+/* Sem fundo quando aberto — só hover */
+.sb-section-header.sb-section-open {
+  background: transparent !important;
+}
+.sb-section-header.sb-section-open:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+.sb-section-header:focus-visible {
+  box-shadow: 0 0 0 2px rgba(243, 15, 34, 0.25);
+}
+
+.sb-nav-item {
+  transition: color 0.2s ease, background 0.22s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease;
+  outline: none;
+  /* borda esquerda reservada para o ativo (não ocupa espaço) */
+  border-left: 2px solid transparent;
+  border-radius: 8px;
+}
+.sb-nav-item:hover {
+  color: rgba(255, 255, 255, 0.9) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+/* Ativo: borda esquerda vermelha + fundo branco levíssimo + texto branco */
+.sb-nav-item-active {
+  border-left-color: #f30f22 !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #fff !important;
+}
+.sb-nav-item-active:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.sb-nav-item:focus-visible {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.sb-footer-btn {
+  transition: color 0.2s ease, background 0.2s ease;
+  outline: none;
+}
+.sb-footer-btn:hover {
+  color: rgba(255, 255, 255, 0.75) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.sb-footer-logout {
+  transition: color 0.2s ease, background 0.2s ease;
+  outline: none;
+}
+.sb-footer-logout:hover {
+  color: #f30f22 !important;
+  background: rgba(243, 15, 34, 0.07) !important;
+}
+
+/* Bloco "Entre em contato com gerente" — clean, sutil */
+.sb-gerente-block {
+  transition: opacity 0.2s ease;
+}
+.sb-gerente-block .sb-gerente-btn {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease, box-shadow 0.2s ease;
+}
+.sb-gerente-block .sb-gerente-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(243, 15, 34, 0.2);
+}
+
+
+/* Scrollbar discreta na área de navegação */
+.sb-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(243, 15, 34, 0.25) transparent;
+}
+.sb-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.sb-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sb-nav::-webkit-scrollbar-thumb {
+  background: rgba(243, 15, 34, 0.25);
+  border-radius: 3px;
+}
+.sb-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(243, 15, 34, 0.4);
+}
+
+/* Linhas do submenu: um único path contínuo, curvas suaves (strokeLinejoin round) */
+.sidebar-submenu-tree {
+  --submenu-line-color: rgba(255, 255, 255, 0.28);
+  --submenu-line-glow: rgba(255, 255, 255, 0.08);
+}
+.sidebar-submenu-tree-lines {
+  filter: drop-shadow(0 0 4px var(--submenu-line-glow, rgba(255, 255, 255, 0.06)));
+  pointer-events: none;
+}
+.sidebar-submenu-tree-lines path {
+  vector-effect: non-scaling-stroke;
+  transition: opacity 0.25s ease;
+}
+

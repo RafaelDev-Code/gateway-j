@@ -1,0 +1,33 @@
+# Deps
+node_modules/
+Laravel/frontend/node_modules/
+Laravel/frontend_backup/node_modules/
+
+# Build
+dist/
+build/
+.output/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Laravel
+Laravel/backend/vendor/
+Laravel/backend/.env
+Laravel/backend/storage/logs/*.log
+Laravel/backend/storage/framework/cache/
+Laravel/backend/storage/framework/sessions/
+Laravel/backend/storage/framework/views/
+
+# IDE & Cursor (contains local config/tokens)
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+.cursor/
+
+# Logs
+*.log
