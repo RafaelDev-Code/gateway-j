@@ -1,43 +1,17 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Bell,
-  Wallet,
-  ArrowLeftRight,
-  AlertOctagon,
-  ArrowUpRight,
-  PlusCircle,
-  Settings,
-  User,
-  Shield,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Zap,
-  X,
-  LogOut,
+  LayoutDashboard, Bell, Wallet, ArrowLeftRight, AlertOctagon,
+  ArrowUpRight, PlusCircle, Settings, User, Shield,
+  ChevronDown, ChevronLeft, ChevronRight, Zap, LogOut,
+  BarChart2, HelpCircle, X,
 } from "lucide-react";
 
-const NAV_ITEMS = [
+const NAV = [
+  { id: "dashboard",    label: "Dashboard",    icon: LayoutDashboard, to: "/",     exact: true },
+  { id: "notificacoes", label: "Notificações",  icon: Bell,            to: "/notificacoes", badge: 3 },
   {
-    id: "dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    to: "/",
-    exact: true,
-  },
-  {
-    id: "notificacoes",
-    label: "Notificações",
-    icon: Bell,
-    to: "/notificacoes",
-    badge: 3,
-  },
-  {
-    id: "financeiro",
-    label: "Financeiro",
-    icon: Wallet,
+    id: "financeiro", label: "Financeiro", icon: Wallet,
     children: [
       { id: "transacoes",   label: "Transações",       icon: ArrowLeftRight, to: "/financeiro/transacoes" },
       { id: "contestacoes", label: "Contestações",      icon: AlertOctagon,   to: "/financeiro/contestacoes" },
@@ -46,9 +20,7 @@ const NAV_ITEMS = [
     ],
   },
   {
-    id: "configuracoes",
-    label: "Configurações",
-    icon: Settings,
+    id: "configuracoes", label: "Configurações", icon: Settings,
     children: [
       { id: "conta",     label: "Minha Conta", icon: User,   to: "/configuracoes/conta" },
       { id: "seguranca", label: "Segurança",   icon: Shield, to: "/configuracoes/seguranca" },
@@ -56,51 +28,44 @@ const NAV_ITEMS = [
   },
 ];
 
-function SidebarItem({ item, collapsed, onMobileClose }) {
-  const location = useLocation();
-  const [open, setOpen] = useState(() => {
-    if (!item.children) return false;
-    return item.children.some((c) => location.pathname.startsWith(c.to));
-  });
+const BOTTOM_NAV = [
+  { id: "suporte", label: "Suporte", icon: HelpCircle, to: "#" },
+  { id: "sair",    label: "Sair",    icon: LogOut,     to: "/login" },
+];
 
-  const isActiveParent =
-    item.children && item.children.some((c) => location.pathname.startsWith(c.to));
+function NavItem({ item, collapsed, onClose }) {
+  const location = useLocation();
+  const hasChildren = Boolean(item.children);
+  const isChildActive = hasChildren && item.children.some((c) => location.pathname.startsWith(c.to));
+
+  const [open, setOpen] = useState(isChildActive);
 
   useEffect(() => {
-    if (isActiveParent) setOpen(true);
-  }, [isActiveParent]);
+    if (isChildActive) setOpen(true);
+  }, [isChildActive]);
 
-  if (item.children) {
+  if (hasChildren) {
     return (
       <div>
         <button
-          className={`sb-item${isActiveParent ? " active" : ""}`}
+          className={`sb-item${isChildActive ? " active" : ""}`}
           onClick={() => !collapsed && setOpen((o) => !o)}
-          style={{ position: "relative" }}
-          title={collapsed ? item.label : undefined}
         >
-          <item.icon className="sb-item-icon" size={18} strokeWidth={2} />
-          <span className="sb-item-label">{item.label}</span>
-          {!collapsed && (
-            <ChevronDown
-              size={15}
-              className={`sb-item-chevron${open ? " open" : ""}`}
-            />
-          )}
+          <item.icon className="sb-icon" size={17} strokeWidth={1.8} />
+          <span className="sb-label">{item.label}</span>
+          <ChevronDown size={14} className={`sb-chevron${open && !collapsed ? " open" : ""}`} />
           {collapsed && <span className="sb-tooltip">{item.label}</span>}
         </button>
 
-        <div className={`sb-submenu${open && !collapsed ? " open" : ""}`}>
+        <div className={`sb-sub${open && !collapsed ? " open" : ""}`}>
           {item.children.map((child) => (
             <NavLink
               key={child.id}
               to={child.to}
-              className={({ isActive }) =>
-                `sb-subitem${isActive ? " active" : ""}`
-              }
-              onClick={onMobileClose}
+              className={({ isActive }) => `sb-subitem${isActive ? " active" : ""}`}
+              onClick={onClose}
             >
-              <child.icon size={14} strokeWidth={2} style={{ flexShrink: 0, color: "inherit", opacity: 0.7 }} />
+              <child.icon size={13} strokeWidth={2} style={{ flexShrink: 0, opacity: 0.7 }} />
               {child.label}
             </NavLink>
           ))}
@@ -109,126 +74,107 @@ function SidebarItem({ item, collapsed, onMobileClose }) {
     );
   }
 
-  const isExact = item.exact;
-
   return (
     <NavLink
       to={item.to}
-      end={isExact}
+      end={item.exact}
       className={({ isActive }) => `sb-item${isActive ? " active" : ""}`}
-      style={{ position: "relative" }}
-      onClick={onMobileClose}
-      title={collapsed ? item.label : undefined}
+      onClick={onClose}
     >
-      <item.icon className="sb-item-icon" size={18} strokeWidth={2} />
-      <span className="sb-item-label">{item.label}</span>
-      {item.badge && (
-        <span className="sb-item-badge">{item.badge}</span>
-      )}
+      <item.icon className="sb-icon" size={17} strokeWidth={1.8} />
+      <span className="sb-label">{item.label}</span>
+      {item.badge && <span className="sb-badge">{item.badge}</span>}
       {collapsed && <span className="sb-tooltip">{item.label}</span>}
     </NavLink>
   );
 }
 
-export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }) {
-  const sidebarClass = [
-    "app-sidebar",
+export function Sidebar({ collapsed, onToggle, isOpen, onClose }) {
+  const cls = [
+    "sidebar",
     collapsed ? "collapsed" : "",
-    mobileOpen ? "mobile-visible" : "mobile-hidden",
-  ]
-    .filter(Boolean)
-    .join(" ");
+    isOpen    ? "is-open"  : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Overlay — mobile only */}
       <div
-        className={`sidebar-overlay${mobileOpen ? " visible" : ""}`}
-        onClick={onMobileClose}
-        aria-hidden="true"
+        className={`overlay${isOpen ? " visible" : ""}`}
+        onClick={onClose}
+        aria-hidden
       />
 
-      <aside className={sidebarClass}>
-        {/* Header */}
-        <div className="sb-header">
+      <aside className={cls}>
+        {/* Logo */}
+        <div className="sb-logo">
           <div className="sb-logo-icon">
-            <Zap size={18} color="#fff" strokeWidth={2.5} />
+            <Zap size={16} color="#fff" strokeWidth={2.5} />
           </div>
-          <span className="sb-logo-text">Gateway JJ</span>
-
+          <span className="sb-logo-name">Gateway JJ</span>
           {/* Mobile close */}
           <button
-            onClick={onMobileClose}
+            onClick={onClose}
             style={{
               marginLeft: "auto",
-              background: "transparent",
+              background: "none",
               border: "none",
               cursor: "pointer",
-              color: "rgba(255,255,255,0.5)",
+              color: "rgba(255,255,255,0.4)",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "6px",
-              padding: "4px",
-              transition: "color 0.2s",
+              borderRadius: 4,
+              padding: 3,
             }}
-            className="lg-hidden"
+            aria-label="Fechar menu"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Navigation */}
+        {/* Nav */}
         <nav className="sb-nav">
-          <div className="sb-section-label">Menu</div>
+          <div className="sb-nav-section">Menu</div>
 
-          {NAV_ITEMS.map((item) => (
-            <SidebarItem
+          {NAV.map((item) => (
+            <NavItem key={item.id} item={item} collapsed={collapsed} onClose={onClose} />
+          ))}
+
+          <div className="sb-nav-section" style={{ marginTop: 6 }}>Outros</div>
+
+          {BOTTOM_NAV.map((item) => (
+            <NavLink
               key={item.id}
-              item={item}
-              collapsed={collapsed}
-              onMobileClose={onMobileClose}
-            />
+              to={item.to}
+              className={({ isActive }) => `sb-item${isActive ? " active" : ""}`}
+              onClick={onClose}
+            >
+              <item.icon className="sb-icon" size={17} strokeWidth={1.8} />
+              <span className="sb-label">{item.label}</span>
+              {collapsed && <span className="sb-tooltip">{item.label}</span>}
+            </NavLink>
           ))}
         </nav>
 
-        {/* Footer — user card */}
-        <div className="sb-footer">
-          <div className="sb-user-card" title={collapsed ? "Admin" : undefined}>
-            <div className="sb-avatar">A</div>
-            <div className="sb-user-info">
-              <div className="sb-user-name">Admin</div>
-              <div className="sb-user-role">Administrador</div>
-            </div>
-            {!collapsed && (
-              <LogOut
-                size={15}
-                style={{ color: "rgba(255,255,255,0.35)", flexShrink: 0 }}
-              />
-            )}
-            {collapsed && <span className="sb-tooltip">Admin</span>}
-          </div>
+        {/* Upgrade CTA */}
+        <div className="sb-upgrade">
+          <p className="sb-upgrade-title">Upgrade para Pro</p>
+          <p className="sb-upgrade-desc">Acesso completo a recursos avançados.</p>
+          <button className="sb-upgrade-btn">Fazer upgrade</button>
         </div>
 
         {/* Desktop collapse toggle */}
         <button
           className="sb-toggle"
           onClick={onToggle}
-          title={collapsed ? "Expandir menu" : "Recolher menu"}
-          style={{ display: "none" }}
-          id="sb-desktop-toggle"
+          title={collapsed ? "Expandir" : "Recolher"}
         >
-          {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+          {collapsed
+            ? <ChevronRight size={12} />
+            : <ChevronLeft  size={12} />
+          }
         </button>
       </aside>
-
-      {/* Desktop toggle trigger — outside sidebar */}
-      <style>{`
-        @media (min-width: 1025px) {
-          #sb-desktop-toggle { display: flex !important; }
-          .lg-hidden { display: none !important; }
-        }
-      `}</style>
     </>
   );
 }

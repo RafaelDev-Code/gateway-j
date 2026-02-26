@@ -3,55 +3,44 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
 const DESKTOP_BP = 1024;
-const STORAGE_KEY = "gjj-sidebar-collapsed";
+const KEY = "gjj-sb-collapsed";
 
 export function Layout({ children }) {
-  const [collapsed, setCollapsed] = useState(() => {
-    return localStorage.getItem(STORAGE_KEY) === "true";
-  });
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth > DESKTOP_BP);
+  const [collapsed,  setCollapsed]  = useState(() => localStorage.getItem(KEY) === "true");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isDesktop,  setIsDesktop]  = useState(window.innerWidth > DESKTOP_BP);
 
   useEffect(() => {
     const mq = window.matchMedia(`(min-width: ${DESKTOP_BP + 1}px)`);
-    const handler = (e) => {
+    const fn = (e) => {
       setIsDesktop(e.matches);
-      if (e.matches) setMobileOpen(false);
+      if (e.matches) setSidebarOpen(false);
     };
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
   }, []);
 
-  const handleToggleCollapse = () => {
-    setCollapsed((c) => {
-      localStorage.setItem(STORAGE_KEY, String(!c));
-      return !c;
-    });
+  const toggle = () => {
+    setCollapsed((c) => { localStorage.setItem(KEY, String(!c)); return !c; });
   };
 
-  const handleOpenMobile = () => setMobileOpen(true);
-  const handleCloseMobile = () => setMobileOpen(false);
-
-  const contentClass = [
-    "app-content",
+  const mainCls = [
+    "main-wrap",
     isDesktop && collapsed ? "collapsed" : "",
-    !isDesktop ? "full-width" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  ].filter(Boolean).join(" ");
 
   return (
-    <div className="app-shell">
+    <div className="shell">
       <Sidebar
         collapsed={isDesktop ? collapsed : false}
-        onToggle={handleToggleCollapse}
-        mobileOpen={mobileOpen}
-        onMobileClose={handleCloseMobile}
+        onToggle={toggle}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
-      <div className={contentClass}>
-        <TopBar onMenuClick={handleOpenMobile} />
-        <main className="app-main">
+      <div className={mainCls}>
+        <TopBar onMenuClick={() => setSidebarOpen(true)} />
+        <main className="page-content">
           {children}
         </main>
       </div>

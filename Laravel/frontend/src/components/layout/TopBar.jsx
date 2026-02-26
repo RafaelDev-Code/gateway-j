@@ -1,109 +1,72 @@
 import { Bell, Search, Sun, Moon, Menu, Settings, ChevronDown } from "lucide-react";
-import { useTheme } from "../../contexts/ThemeContext";
 import { useLocation } from "react-router-dom";
+import { useTheme } from "../../contexts/ThemeContext";
 
-const PAGE_TITLES = {
-  "/":                            { title: "Dashboard",         sub: "Visão geral do seu negócio" },
-  "/notificacoes":                { title: "Notificações",       sub: "Suas mensagens e alertas" },
-  "/financeiro/transacoes":       { title: "Transações",         sub: "Financeiro" },
-  "/financeiro/contestacoes":     { title: "Contestações",       sub: "Financeiro" },
-  "/financeiro/saque":            { title: "Solicitar Saque",    sub: "Financeiro" },
-  "/financeiro/recebimento":      { title: "Criar Recebimento",  sub: "Financeiro" },
-  "/configuracoes/conta":         { title: "Minha Conta",        sub: "Configurações" },
-  "/configuracoes/seguranca":     { title: "Segurança",          sub: "Configurações" },
+const TITLES = {
+  "/":                        { title: "Dashboard",         bread: "Dashboard" },
+  "/notificacoes":            { title: "Notificações",       bread: "Dashboard / Notificações" },
+  "/financeiro/transacoes":   { title: "Transações",         bread: "Financeiro / Transações" },
+  "/financeiro/contestacoes": { title: "Contestações",       bread: "Financeiro / Contestações" },
+  "/financeiro/saque":        { title: "Solicitar Saque",    bread: "Financeiro / Solicitar Saque" },
+  "/financeiro/recebimento":  { title: "Criar Recebimento",  bread: "Financeiro / Criar Recebimento" },
+  "/configuracoes/conta":     { title: "Minha Conta",        bread: "Configurações / Minha Conta" },
+  "/configuracoes/seguranca": { title: "Segurança",          bread: "Configurações / Segurança" },
 };
 
 export function TopBar({ onMenuClick }) {
   const { theme, toggleTheme } = useTheme();
-  const location = useLocation();
-  const page = PAGE_TITLES[location.pathname] || { title: "Painel", sub: "" };
+  const { pathname } = useLocation();
+  const { title, bread } = TITLES[pathname] || { title: "Painel", bread: "" };
 
   return (
-    <header className="app-topbar">
-      {/* Mobile hamburger */}
-      <button className="tb-menu-btn" onClick={onMenuClick} aria-label="Abrir menu">
-        <Menu size={20} />
+    <header className="topbar">
+      {/* Hamburger */}
+      <button className="tb-hamburger" onClick={onMenuClick} aria-label="Menu">
+        <Menu size={19} />
       </button>
 
-      {/* Page info */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 0, minWidth: 0 }}>
-        <span style={{
-          fontSize: 16,
-          fontWeight: 700,
-          color: "var(--text-primary)",
-          letterSpacing: "-0.02em",
-          lineHeight: 1.2,
-          whiteSpace: "nowrap",
-        }}>
-          {page.title}
-        </span>
-        {page.sub && page.sub !== page.title && (
-          <span style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.3 }}>
-            {page.sub} / {page.title}
-          </span>
-        )}
-      </div>
-
       {/* Search */}
-      <div className="tb-search" style={{ marginLeft: 16 }}>
-        <Search size={15} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
-        <input
-          type="text"
-          placeholder="Buscar transação, cliente..."
-          aria-label="Buscar"
-        />
-        <kbd style={{
-          fontSize: 10,
-          background: "var(--bg-hover)",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          padding: "2px 5px",
-          color: "var(--text-muted)",
-          fontFamily: "inherit",
-          flexShrink: 0,
-        }}>
-          ⌘K
-        </kbd>
+      <div className="tb-search">
+        <Search size={14} className="tb-search-icon" />
+        <input type="text" placeholder="Buscar transação, cliente..." aria-label="Buscar" />
+        <kbd className="tb-search-kbd">⌘K</kbd>
       </div>
 
-      <div className="tb-spacer" />
+      <div className="tb-gap" />
 
       {/* Actions */}
       <div className="tb-actions">
         {/* Theme toggle */}
         <button
-          className="tb-icon-btn"
+          className="tb-btn"
           onClick={toggleTheme}
-          aria-label={theme === "light" ? "Ativar modo escuro" : "Ativar modo claro"}
           title={theme === "light" ? "Modo escuro" : "Modo claro"}
+          aria-label="Alternar tema"
         >
-          {theme === "light"
-            ? <Moon size={16} />
-            : <Sun size={16} />
-          }
+          {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
         </button>
 
         {/* Notifications */}
-        <button className="tb-icon-btn" aria-label="Notificações" title="Notificações">
-          <Bell size={16} />
-          <span className="tb-notif-badge" aria-hidden="true" />
+        <button className="tb-btn" title="Notificações" aria-label="Notificações">
+          <Bell size={15} />
+          <span className="tb-dot" aria-hidden />
         </button>
 
         {/* Settings */}
-        <button className="tb-icon-btn" aria-label="Configurações rápidas" title="Configurações">
-          <Settings size={16} />
+        <button className="tb-btn" title="Configurações" aria-label="Configurações">
+          <Settings size={15} />
         </button>
 
-        <div className="tb-divider" />
+        <div className="tb-sep" />
 
         {/* User */}
-        <button className="tb-user" aria-label="Menu do usuário">
-          <div className="tb-user-avatar">A</div>
-          <div className="tb-user-info">
-            <span className="tb-user-name">Admin</span>
-            <span className="tb-user-role">Administrador</span>
+        <button className="tb-user" aria-label="Perfil">
+          <div className="tb-avatar">A</div>
+          <div>
+            <div className="tb-user-name">Admin</div>
+            <div className="tb-user-role">Administrador</div>
           </div>
-          <ChevronDown size={14} style={{ color: "var(--text-muted)", marginLeft: 2 }} />
+          <ChevronDown size={13} style={{ color: "var(--text-3)", marginLeft: 2 }} />
         </button>
       </div>
     </header>
