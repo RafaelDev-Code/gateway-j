@@ -262,7 +262,7 @@ export function Dashboard() {
 
             <div className="card-chart-inner">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 8, right: 4, left: -12, bottom: 0 }}>
+                <AreaChart data={chartData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradTransacoes" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#0D9488" stopOpacity={0.35} />
@@ -278,6 +278,7 @@ export function Dashboard() {
                     interval={chartPeriod === "30d" ? 2 : 0}
                   />
                   <YAxis
+                    width={28}
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: "var(--text-3)", fontSize: 11 }}

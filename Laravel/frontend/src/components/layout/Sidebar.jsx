@@ -32,7 +32,7 @@ const SECTIONS = [
     items: [
       { id: "conta",        label: "Minha Conta",          icon: User,   to: "/configuracoes/conta"        },
       { id: "seguranca",    label: "Segurança",            icon: Shield, to: "/configuracoes/seguranca"    },
-      { id: "integracoes",  label: "Integrações Externas", icon: Plug,   to: "/configuracoes/integracoes"  },
+      { id: "integracoes",  label: "Integrações",          icon: Plug,   to: "/configuracoes/integracoes"  },
     ],
   },
 ];

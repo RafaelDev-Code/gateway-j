@@ -236,6 +236,10 @@ export function MinhaConta() {
               <div style={{ textAlign: "center" }}>
                 <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>{DADOS.nome}</p>
                 <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>{DADOS.email}</p>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 6, padding: "2px 7px" }}>
+                  <span style={{ fontSize: 10, color: "var(--text-3)" }}>ID</span>
+                  <span style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, color: "var(--text-2)", letterSpacing: ".02em" }}>4242423</span>
+                </span>
               </div>
               <span className="badge badge-green" style={{ fontSize: 10 }}><BadgeCheck size={10} /> Conta verificada</span>
             </div>
