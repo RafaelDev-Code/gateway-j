@@ -10,7 +10,7 @@ import {
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
 function gerarApiKey()    { return "gjj_pk_" + Array.from({length:32}, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random()*36)]).join(""); }
-function gerarApiSecret() { return "gjj_sk_"  + Array.from({length:32}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random()*62)]).join(""); }
+function gerarApiSecret() { return "gjj_sk_" + Array.from({length:32}, () => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random()*62)]).join(""); }
 
 function CopyBtn({ value }) {
   const [ok, setOk] = useState(false);
