@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
@@ -29,14 +30,29 @@ export function Layout({ children }) {
     isDesktop && collapsed ? "collapsed" : "",
   ].filter(Boolean).join(" ");
 
+  const sbCollapsed = isDesktop ? collapsed : false;
+  const toggleLeft = sbCollapsed ? "calc(var(--sb-collapsed) - 12px)" : "calc(var(--sb-width) - 12px)";
+
   return (
     <div className="shell">
       <Sidebar
-        collapsed={isDesktop ? collapsed : false}
+        collapsed={sbCollapsed}
         onToggle={toggle}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
+
+      {/* Toggle fora da sidebar — nunca cortado por overflow */}
+      {isDesktop && (
+        <button
+          className="sb-toggle"
+          onClick={toggle}
+          title={sbCollapsed ? "Expandir" : "Recolher"}
+          style={{ left: toggleLeft }}
+        >
+          {sbCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+        </button>
+      )}
 
       <div className={mainCls}>
         <TopBar onMenuClick={() => setSidebarOpen(true)} />

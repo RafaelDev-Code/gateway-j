@@ -1,6 +1,22 @@
-import { Bell, Search, Sun, Moon, Menu, Settings, ChevronDown } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Bell, Sun, Moon, Menu, ChevronDown, User, Shield, LogOut } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
+
+const TZ_BRASILIA = "America/Sao_Paulo";
+
+function formatDataBrasilia() {
+  const now = new Date();
+  const weekday = now.toLocaleDateString("pt-BR", { timeZone: TZ_BRASILIA, weekday: "long" });
+  const datePart = now.toLocaleDateString("pt-BR", {
+    timeZone: TZ_BRASILIA,
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+  const capitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  return `${capitalized} - ${datePart}`;
+}
 
 const TITLES = {
   "/":                        { title: "Dashboard",         bread: "Dashboard" },
@@ -13,10 +29,42 @@ const TITLES = {
   "/configuracoes/seguranca": { title: "Segurança",          bread: "Configurações / Segurança" },
 };
 
+/* Número de não-lidas simulado (em produção viria de contexto/API) */
+const NOTIFS_NAO_LIDAS = 3;
+
 export function TopBar({ onMenuClick }) {
   const { theme, toggleTheme } = useTheme();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { title, bread } = TITLES[pathname] || { title: "Painel", bread: "" };
+
+  const [dataBrasilia,   setDataBrasilia]   = useState(() => formatDataBrasilia());
+  const [dropdownAberto, setDropdownAberto] = useState(false);
+
+  const dropRef = useRef(null);
+
+  useEffect(() => {
+    const tick = () => setDataBrasilia(formatDataBrasilia());
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  /* Fecha dropdown ao clicar fora */
+  useEffect(() => {
+    if (!dropdownAberto) return;
+    const handler = (e) => {
+      if (dropRef.current && !dropRef.current.contains(e.target)) {
+        setDropdownAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [dropdownAberto]);
+
+  const irPara = (path) => {
+    setDropdownAberto(false);
+    navigate(path);
+  };
 
   return (
     <header className="topbar">
@@ -25,11 +73,13 @@ export function TopBar({ onMenuClick }) {
         <Menu size={19} />
       </button>
 
-      {/* Search */}
-      <div className="tb-search">
-        <Search size={14} className="tb-search-icon" />
-        <input type="text" placeholder="Buscar transação, cliente..." aria-label="Buscar" />
-        <kbd className="tb-search-kbd">⌘K</kbd>
+      {/* Saudação */}
+      <div className="tb-greeting">
+        <p className="tb-greeting-line">
+          <span className="tb-greeting-ola">Olá,</span>{" "}
+          <span className="tb-greeting-name">Rafael Araujo.</span>
+        </p>
+        <p className="tb-greeting-date">{dataBrasilia}</p>
       </div>
 
       <div className="tb-gap" />
@@ -46,28 +96,60 @@ export function TopBar({ onMenuClick }) {
           {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
         </button>
 
-        {/* Notifications */}
-        <button className="tb-btn" title="Notificações" aria-label="Notificações">
+        {/* Sino — navega para /notificacoes */}
+        <button
+          className="tb-btn"
+          title="Notificações"
+          aria-label="Notificações"
+          onClick={() => navigate("/notificacoes")}
+        >
           <Bell size={15} />
-          <span className="tb-dot" aria-hidden />
-        </button>
-
-        {/* Settings */}
-        <button className="tb-btn" title="Configurações" aria-label="Configurações">
-          <Settings size={15} />
+          {NOTIFS_NAO_LIDAS > 0 && <span className="tb-dot" aria-hidden />}
         </button>
 
         <div className="tb-sep" />
 
-        {/* User */}
-        <button className="tb-user" aria-label="Perfil">
-          <div className="tb-avatar">A</div>
-          <div>
-            <div className="tb-user-name">Admin</div>
-            <div className="tb-user-role">Administrador</div>
-          </div>
-          <ChevronDown size={13} style={{ color: "var(--text-3)", marginLeft: 2 }} />
-        </button>
+        {/* Área de perfil com dropdown */}
+        <div ref={dropRef} style={{ position: "relative" }}>
+          <button
+            className="tb-user"
+            aria-label="Perfil"
+            aria-expanded={dropdownAberto}
+            onClick={() => setDropdownAberto((v) => !v)}
+          >
+            <div className="tb-avatar">A</div>
+            <div>
+              <div className="tb-user-name">Admin</div>
+              <div className="tb-user-role">Administrador</div>
+            </div>
+            <ChevronDown
+              size={13}
+              style={{
+                color: "var(--text-3)", marginLeft: 2,
+                transition: "transform 200ms",
+                transform: dropdownAberto ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            />
+          </button>
+
+          {dropdownAberto && (
+            <div className="tb-dropdown">
+              <button className="tb-dropdown-item" onClick={() => irPara("/configuracoes/conta")}>
+                <User size={14} />
+                Minha conta
+              </button>
+              <button className="tb-dropdown-item" onClick={() => irPara("/configuracoes/seguranca")}>
+                <Shield size={14} />
+                Segurança
+              </button>
+              <div className="tb-dropdown-sep" />
+              <button className="tb-dropdown-item tb-dropdown-danger" onClick={() => irPara("/login")}>
+                <LogOut size={14} />
+                Sair da conta
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

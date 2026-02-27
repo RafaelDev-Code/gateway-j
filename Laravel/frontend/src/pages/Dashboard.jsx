@@ -1,16 +1,52 @@
 import { useState } from "react";
 import {
-  TrendingUp, TrendingDown, Activity, DollarSign,
-  ArrowUpRight, ArrowDownRight, Filter, Download,
-  MoreHorizontal, RefreshCw, CheckCircle2, Clock,
-  XCircle, RotateCcw, Eye, EyeOff,
+  TrendingUp, TrendingDown, Activity,
+  ArrowUpRight, ArrowDownRight,
+  Eye, EyeOff, Wallet, ShieldAlert,
 } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, Cell,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer,
 } from "recharts";
 
 /* ── Mock data ────────────────────────────────────────── */
+/* Movimentações por hora do dia (00h–23h) */
+const HOURS = [
+  { hora: "00h", transacoes: 4 },  { hora: "01h", transacoes: 2 },  { hora: "02h", transacoes: 1 },
+  { hora: "03h", transacoes: 0 },  { hora: "04h", transacoes: 1 },  { hora: "05h", transacoes: 3 },
+  { hora: "06h", transacoes: 8 },  { hora: "07h", transacoes: 12 }, { hora: "08h", transacoes: 18 },
+  { hora: "09h", transacoes: 22 },  { hora: "10h", transacoes: 28 }, { hora: "11h", transacoes: 31 },
+  { hora: "12h", transacoes: 25 },  { hora: "13h", transacoes: 30 }, { hora: "14h", transacoes: 35 },
+  { hora: "15h", transacoes: 29 },  { hora: "16h", transacoes: 26 }, { hora: "17h", transacoes: 24 },
+  { hora: "18h", transacoes: 19 },  { hora: "19h", transacoes: 14 }, { hora: "20h", transacoes: 11 },
+  { hora: "21h", transacoes: 9 },   { hora: "22h", transacoes: 6 },  { hora: "23h", transacoes: 3 },
+];
+
+/* Últimos 7 dias (um barra por dia) */
+const DATA_7D = [
+  { dia: "20/02", transacoes: 198 },
+  { dia: "21/02", transacoes: 215 },
+  { dia: "22/02", transacoes: 189 },
+  { dia: "23/02", transacoes: 174 },
+  { dia: "24/02", transacoes: 221 },
+  { dia: "25/02", transacoes: 243 },
+  { dia: "26/02", transacoes: 267 },
+];
+
+/* Últimos 30 dias (uma barra por dia, labels enxutos) */
+const DATA_30D = [
+  { dia: "D1",  transacoes: 180 }, { dia: "D2",  transacoes: 192 }, { dia: "D3",  transacoes: 205 },
+  { dia: "D4",  transacoes: 178 }, { dia: "D5",  transacoes: 220 }, { dia: "D6",  transacoes: 235 },
+  { dia: "D7",  transacoes: 198 }, { dia: "D8",  transacoes: 215 }, { dia: "D9",  transacoes: 189 },
+  { dia: "D10", transacoes: 240 }, { dia: "D11", transacoes: 252 }, { dia: "D12", transacoes: 228 },
+  { dia: "D13", transacoes: 195 }, { dia: "D14", transacoes: 210 }, { dia: "D15", transacoes: 245 },
+  { dia: "D16", transacoes: 230 }, { dia: "D17", transacoes: 218 }, { dia: "D18", transacoes: 198 },
+  { dia: "D19", transacoes: 225 }, { dia: "D20", transacoes: 198 }, { dia: "D21", transacoes: 215 },
+  { dia: "D22", transacoes: 189 }, { dia: "D23", transacoes: 174 }, { dia: "D24", transacoes: 221 },
+  { dia: "D25", transacoes: 243 }, { dia: "D26", transacoes: 267 }, { dia: "D27", transacoes: 255 },
+  { dia: "D28", transacoes: 238 }, { dia: "D29", transacoes: 242 }, { dia: "D30", transacoes: 260 },
+];
+
 const BAR_DATA = [
   { mes: "Jan", entradas: 38, saidas: 18 },
   { mes: "Fev", entradas: 42, saidas: 22 },
@@ -26,61 +62,62 @@ const BAR_DATA = [
   { mes: "Dez", entradas: 86, saidas: 38 },
 ];
 
-const ACQUIRERS = [
-  { name: "PagPix",  status: "online",   lat: "42ms"  },
-  { name: "RapDyn",  status: "online",   lat: "38ms"  },
-  { name: "WiteTec", status: "online",   lat: "61ms"  },
-  { name: "Strike",  status: "degraded", lat: "180ms" },
-  { name: "Versell", status: "online",   lat: "55ms"  },
-  { name: "BSPay",   status: "offline",  lat: "—"     },
+/* Formas de conversão: só % e barras (sem valor em R$) */
+const FORMAS_CONVERSAO = [
+  { id: "pix",    label: "Pix",             pct: 67, barColor: "var(--accent)" },
+  { id: "cartao", label: "Cartão",          pct: 23, barColor: "var(--blue)" },
+  { id: "boleto", label: "Boleto",           pct: 10, barColor: "var(--green)" },
+  { id: "sep",    separator: true },
+  { id: "charge", label: "Chargebacks",      pct: 2,  barColor: "var(--yellow)" },
+  { id: "pre",    label: "Pre-chargebacks",  pct: 1,  barColor: "var(--red)" },
 ];
-
-const TXS = [
-  { id: "TXN-8821", tipo: "PIX Entrada", cliente: "Loja do João",    valor:  1250.00, status: "aprovado",  adq: "PagPix",  data: "26/02 14:32" },
-  { id: "TXN-8820", tipo: "PIX Saída",   cliente: "Fornecedor ABC",  valor: -340.50,  status: "aprovado",  adq: "RapDyn",  data: "26/02 13:18" },
-  { id: "TXN-8819", tipo: "PIX Entrada", cliente: "Maria Silva",     valor:  5000.00, status: "pendente",  adq: "WiteTec", data: "26/02 12:45" },
-  { id: "TXN-8818", tipo: "PIX Saída",   cliente: "Saque Manual",    valor: -2000.00, status: "aprovado",  adq: "PagPix",  data: "26/02 11:20" },
-  { id: "TXN-8817", tipo: "PIX Entrada", cliente: "E-commerce XYZ",  valor:  785.90,  status: "aprovado",  adq: "Versell", data: "26/02 10:55" },
-  { id: "TXN-8816", tipo: "PIX Entrada", cliente: "Carlos Pereira",  valor:  320.00,  status: "falhou",    adq: "Strike",  data: "26/02 09:30" },
-  { id: "TXN-8815", tipo: "PIX Saída",   cliente: "Estorno #8810",   valor: -150.00,  status: "estornado", adq: "WiteTec", data: "25/02 18:14" },
-  { id: "TXN-8814", tipo: "PIX Entrada", cliente: "Startup Dev",     valor:  9800.00, status: "aprovado",  adq: "PagPix",  data: "25/02 16:00" },
-];
-
-const STATUS = {
-  aprovado:  { label: "Aprovado",  cls: "badge-green",  icon: CheckCircle2 },
-  pendente:  { label: "Pendente",  cls: "badge-yellow", icon: Clock        },
-  falhou:    { label: "Falhou",    cls: "badge-red",     icon: XCircle      },
-  estornado: { label: "Estornado", cls: "badge-blue",   icon: RotateCcw    },
-};
 
 /* ── Custom Tooltip ───────────────────────────────────── */
-function ChartTip({ active, payload, label }) {
+function ChartTipHour({ active, payload, label }) {
   if (!active || !payload?.length) return null;
+  const v = payload[0]?.value ?? 0;
   return (
     <div style={{
       background: "var(--surface)",
       border: "1px solid var(--border)",
       borderRadius: "var(--radius)",
-      padding: "10px 14px",
+      padding: "8px 12px",
       boxShadow: "var(--shadow)",
       fontSize: 13,
     }}>
-      <p style={{ fontWeight: 600, color: "var(--text-1)", marginBottom: 6 }}>{label}</p>
-      {payload.map((p) => (
-        <p key={p.dataKey} style={{ color: p.color, marginBottom: 2 }}>
-          {p.name}: R$ {p.value}k
-        </p>
-      ))}
+      <p style={{ fontWeight: 600, color: "var(--text-1)", marginBottom: 2 }}>{label}</p>
+      <p style={{ color: "var(--text-2)", margin: 0 }}>{v} transações</p>
+    </div>
+  );
+}
+
+function ChartTipDay({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  const v = payload[0]?.value ?? 0;
+  return (
+    <div style={{
+      background: "var(--surface)",
+      border: "1px solid var(--border)",
+      borderRadius: "var(--radius)",
+      padding: "8px 12px",
+      boxShadow: "var(--shadow)",
+      fontSize: 13,
+    }}>
+      <p style={{ fontWeight: 600, color: "var(--text-1)", marginBottom: 2 }}>{label}</p>
+      <p style={{ color: "var(--text-2)", margin: 0 }}>{v} transações</p>
     </div>
   );
 }
 
 /* ── KPI Card ─────────────────────────────────────────── */
-function KPI({ label, value, delta, up, icon: Icon, iconBg, iconColor, delay, hidden }) {
+function KPI({ label, sublabel, value, delta, up, icon: Icon, iconBg, iconColor, delay, hidden }) {
   return (
     <div className={`kpi-card fade-up d${delay}`}>
       <div className="kpi-top">
-        <span className="kpi-label">{label}</span>
+        <div>
+          <span className="kpi-label">{label}</span>
+          {sublabel && <span className="kpi-sublabel">{sublabel}</span>}
+        </div>
         <div className="kpi-icon" style={{ background: iconBg }}>
           <Icon size={16} color={iconColor} strokeWidth={2} />
         </div>
@@ -88,322 +125,206 @@ function KPI({ label, value, delta, up, icon: Icon, iconBg, iconColor, delay, hi
       <div className="kpi-value">
         {hidden ? "R$ ••••" : value}
       </div>
-      <span className={`kpi-delta ${up ? "up" : typeof up === "boolean" ? "down" : "flat"}`}>
-        {up === true  && <TrendingUp  size={11} />}
-        {up === false && <TrendingDown size={11} />}
-        {up === null  && <Activity    size={11} />}
-        {delta}
-      </span>
+      {delta != null && (
+        <span className={`kpi-delta ${up ? "up" : typeof up === "boolean" ? "down" : "flat"}`}>
+          {up === true  && <TrendingUp  size={11} />}
+          {up === false && <TrendingDown size={11} />}
+          {up === null  && <Activity    size={11} />}
+          {delta}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ── Card Transações Hoje — só quantidade ────────────── */
+function KPITransacoesHoje({ delay, hidden }) {
+  const totais = { pix: 142, cartao: 48, boleto: 23 };
+  const total = totais.pix + totais.cartao + totais.boleto;
+  return (
+    <div className={`kpi-card kpi-card-transacoes-simple fade-up d${delay}`}>
+      <div className="kpi-top">
+        <div>
+          <span className="kpi-label">Transações Hoje</span>
+          <span className="kpi-sublabel">Quantidades</span>
+        </div>
+        <div className="kpi-icon" style={{ background: "var(--blue-faint)" }}>
+          <Activity size={16} color="var(--blue)" strokeWidth={2} />
+        </div>
+      </div>
+      <div className="kpi-value">
+        {hidden ? "•••" : total.toLocaleString("pt-BR")}
+      </div>
+      <div className="kpi-qty-row">
+        <span>Pix <strong>{hidden ? "—" : totais.pix}</strong></span>
+        <span>Cartão <strong>{hidden ? "—" : totais.cartao}</strong></span>
+        <span>Boleto <strong>{hidden ? "—" : totais.boleto}</strong></span>
+      </div>
     </div>
   );
 }
 
 /* ── Main ─────────────────────────────────────────────── */
 export function Dashboard() {
-  const [period,  setPeriod]  = useState("Mensal");
+  const [chartPeriod, setChartPeriod] = useState("hoje"); // hoje | 7d | 30d
   const [hidden,  setHidden]  = useState(false);
+
+  const chartData = chartPeriod === "hoje" ? HOURS : chartPeriod === "7d" ? DATA_7D : DATA_30D;
+  const chartDataKey = chartPeriod === "hoje" ? "hora" : "dia";
+  const chartSubtitle =
+    chartPeriod === "hoje"
+      ? "Transações por hora (00h às 23h59)"
+      : chartPeriod === "7d"
+      ? "Transações por dia — últimos 7 dias"
+      : "Transações por dia — últimos 30 dias";
 
   return (
     <div className="fade-in">
-      {/* Page header */}
-      <div className="page-head">
+      <div className="page-header animate-fade-in">
         <div>
           <h1 className="page-title">Dashboard</h1>
-          <p className="page-bread">Dashboard <span>/ Visão Geral</span></p>
+          <p className="page-subtitle">Visão geral de saldo, entradas e movimentações</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => setHidden((h) => !h)}
-            title={hidden ? "Mostrar valores" : "Ocultar valores"}
-          >
-            {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
-            {hidden ? "Mostrar" : "Ocultar"}
-          </button>
-          <button className="btn btn-ghost btn-sm">
-            <Filter size={14} /> Filtrar
-          </button>
-        </div>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => setHidden((h) => !h)}
+          title={hidden ? "Mostrar valores" : "Ocultar valores"}
+        >
+          {hidden ? <Eye size={14} /> : <EyeOff size={14} />}
+          {hidden ? "Mostrar" : "Ocultar"}
+        </button>
       </div>
 
-      {/* KPI cards */}
-      <div className="kpi-row">
+      <div className="dash-4col">
         <KPI
-          label="Saldo Disponível" value="R$ 48.240,00"
-          delta="+8,2% este mês" up={true}
-          icon={DollarSign} iconBg="var(--accent-faint)" iconColor="var(--accent)"
-          delay={1} hidden={hidden}
+          label="Saldo Disponível"
+          sublabel="Disponível para saque"
+          value="R$ 48.240,00"
+          delta="+8,2% este mês"
+          up={true}
+          icon={Wallet}
+          iconBg="var(--accent-faint)"
+          iconColor="var(--accent)"
+          delay={1}
+          hidden={hidden}
         />
         <KPI
-          label="Entradas (mês)" value="R$ 48.350,00"
-          delta="+12,4% mês anterior" up={true}
-          icon={ArrowUpRight} iconBg="var(--green-faint)" iconColor="var(--green)"
-          delay={2} hidden={hidden}
+          label="Entradas Hoje"
+          sublabel="Pagamentos recebidos"
+          value="R$ 12.350,00"
+          delta="+12,4% ontem"
+          up={true}
+          icon={ArrowUpRight}
+          iconBg="var(--green-faint)"
+          iconColor="var(--green)"
+          delay={2}
+          hidden={hidden}
         />
         <KPI
-          label="Saídas (mês)" value="R$ 12.820,00"
-          delta="-3,1% mês anterior" up={false}
-          icon={ArrowDownRight} iconBg="var(--red-faint)" iconColor="var(--red)"
-          delay={3} hidden={hidden}
+          label="Bloqueio Cautelar"
+          sublabel="Meios para disputa"
+          value="R$ 3.200,00"
+          delta="2 contestações"
+          up={null}
+          icon={ShieldAlert}
+          iconBg="var(--yellow-faint)"
+          iconColor="var(--yellow)"
+          delay={3}
+          hidden={hidden}
         />
-        <KPI
-          label="Transações (mês)" value="1.247"
-          delta="+18 hoje" up={null}
-          icon={Activity} iconBg="var(--blue-faint)" iconColor="var(--blue)"
-          delay={4} hidden={false}
-        />
-      </div>
+        <KPITransacoesHoje delay={4} hidden={hidden} />
 
-      {/* Main grid */}
-      <div className="dash-grid">
-        {/* Left */}
-        <div className="dash-left">
-          {/* Bar chart */}
-          <div className="card fade-up d2">
+        {/* Linha 2: chart (3 colunas) + formas de conversão (1 coluna) */}
+        <div className="dash-chart-col">
+          {/* Movimentações do Dia (por hora 00h–23h) ou 7d / 30d */}
+          <div className="card card-chart-movimentos fade-up d2">
             <div className="card-head">
               <div>
-                <p className="card-title">Movimentações do Ano</p>
-                <p className="card-subtitle">Entradas e saídas mensais em 2026</p>
+                <p className="card-title">Movimentações do Dia</p>
+                <p className="card-subtitle">{chartSubtitle}</p>
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                {["Mensal", "Semanal", "Anual"].map((p) => (
+                {[
+                  { id: "hoje", label: "Hoje" },
+                  { id: "7d",    label: "Últimos 7 dias" },
+                  { id: "30d",   label: "Últimos 30 dias" },
+                ].map((p) => (
                   <button
-                    key={p}
-                    className={`btn btn-xs${period === p ? " btn-primary" : " btn-ghost"}`}
-                    onClick={() => setPeriod(p)}
+                    key={p.id}
+                    className={`btn btn-xs${chartPeriod === p.id ? " btn-primary" : " btn-ghost"}`}
+                    onClick={() => setChartPeriod(p.id)}
                   >
-                    {p}
+                    {p.label}
                   </button>
                 ))}
-                <button className="btn btn-ghost btn-icon btn-sm">
-                  <Download size={13} />
-                </button>
               </div>
             </div>
 
-            <div style={{ padding: "16px 16px 8px", height: 272 }}>
+            <div className="card-chart-inner">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={BAR_DATA} margin={{ top: 4, right: 4, left: -18, bottom: 0 }} barGap={4}>
+                <AreaChart data={chartData} margin={{ top: 8, right: 4, left: -12, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradTransacoes" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0D9488" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#0D9488" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis
-                    dataKey="mes"
-                    axisLine={false} tickLine={false}
-                    tick={{ fill: "var(--text-3)", fontSize: 12 }}
+                    dataKey={chartDataKey}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "var(--text-3)", fontSize: chartPeriod === "30d" ? 9 : 10 }}
+                    interval={chartPeriod === "30d" ? 2 : 0}
                   />
                   <YAxis
-                    axisLine={false} tickLine={false}
+                    axisLine={false}
+                    tickLine={false}
                     tick={{ fill: "var(--text-3)", fontSize: 11 }}
-                    tickFormatter={(v) => `${v}k`}
+                    allowDecimals={false}
                   />
-                  <Tooltip content={<ChartTip />} cursor={{ fill: "var(--surface-2)", radius: 4 }} />
-                  <Legend
-                    wrapperStyle={{ paddingTop: 12, fontSize: 12 }}
-                    formatter={(v) => (
-                      <span style={{ color: "var(--text-2)", fontWeight: 500 }}>
-                        {v === "entradas" ? "Entradas" : "Saídas"}
-                      </span>
-                    )}
+                  <Tooltip content={chartPeriod === "hoje" ? <ChartTipHour /> : <ChartTipDay />} cursor={{ stroke: "var(--border)", strokeWidth: 1 }} />
+                  <Area
+                    type="monotone"
+                    dataKey="transacoes"
+                    name="Transações"
+                    stroke="#0D9488"
+                    strokeWidth={2}
+                    fill="url(#gradTransacoes)"
+                    dot={false}
+                    activeDot={{ r: 4, fill: "#0D9488", stroke: "var(--surface)", strokeWidth: 2 }}
                   />
-                  {/* PayU style: active bars striped, inactive bars gray */}
-                  <Bar dataKey="entradas" name="entradas" radius={[3, 3, 0, 0]} maxBarSize={20}>
-                    {BAR_DATA.map((_, i) => {
-                      const active = i >= 3 && i <= 5;
-                      return (
-                        <Cell
-                          key={i}
-                          fill={active ? "var(--accent)" : "var(--border)"}
-                        />
-                      );
-                    })}
-                  </Bar>
-                  <Bar dataKey="saidas" name="saidas" radius={[3, 3, 0, 0]} maxBarSize={20}>
-                    {BAR_DATA.map((_, i) => {
-                      const active = i >= 3 && i <= 5;
-                      return (
-                        <Cell
-                          key={i}
-                          fill={active ? "#18181B" : "var(--border-2)"}
-                        />
-                      );
-                    })}
-                  </Bar>
-                </BarChart>
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
-
-          {/* Recent Transactions */}
-          <div className="card fade-up d3">
-            <div className="card-head">
-              <div>
-                <p className="card-title">Transações Recentes</p>
-                <p className="card-subtitle">Últimas 8 movimentações</p>
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button className="btn btn-ghost btn-sm">
-                  <Filter size={13} /> Filtrar
-                </button>
-                <button className="btn btn-ghost btn-sm">
-                  Ver todas
-                </button>
-              </div>
-            </div>
-
-            <div style={{ overflowX: "auto" }}>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Tipo</th>
-                    <th>Cliente</th>
-                    <th style={{ textAlign: "right" }}>Valor</th>
-                    <th>Status</th>
-                    <th>Adquirente</th>
-                    <th>Data</th>
-                    <th style={{ width: 36 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {TXS.map((tx) => {
-                    const pos = tx.valor > 0;
-                    const s = STATUS[tx.status];
-                    return (
-                      <tr key={tx.id}>
-                        <td>
-                          <span style={{
-                            fontFamily: "monospace",
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: "var(--text-1)",
-                          }}>
-                            {tx.id}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{
-                              width: 28, height: 28,
-                              borderRadius: "var(--radius-sm)",
-                              background: pos ? "var(--green-faint)" : "var(--red-faint)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              flexShrink: 0,
-                            }}>
-                              {pos
-                                ? <ArrowUpRight   size={13} color="var(--green)" />
-                                : <ArrowDownRight size={13} color="var(--red)" />
-                              }
-                            </div>
-                            <span style={{ fontSize: 13, color: "var(--text-1)" }}>{tx.tipo}</span>
-                          </div>
-                        </td>
-                        <td style={{ fontWeight: 500, color: "var(--text-1)" }}>{tx.cliente}</td>
-                        <td style={{ textAlign: "right" }}>
-                          <span style={{
-                            fontWeight: 700,
-                            fontSize: 13,
-                            color: pos ? "var(--green)" : "var(--red)",
-                          }}>
-                            {pos ? "+" : ""}
-                            {tx.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`badge ${s.cls}`}>
-                            <span style={{
-                              width: 5, height: 5, borderRadius: "50%",
-                              background: "currentColor", flexShrink: 0,
-                            }} />
-                            {s.label}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{
-                            fontSize: 11, fontWeight: 600,
-                            color: "var(--text-3)",
-                            background: "var(--surface-2)",
-                            border: "1px solid var(--border)",
-                            padding: "2px 7px",
-                            borderRadius: 99,
-                          }}>
-                            {tx.adq}
-                          </span>
-                        </td>
-                        <td style={{ fontSize: 12, color: "var(--text-3)", whiteSpace: "nowrap" }}>{tx.data}</td>
-                        <td>
-                          <button
-                            className="btn btn-ghost btn-icon"
-                            style={{ width: 28, height: 28, border: "none", background: "transparent" }}
-                          >
-                            <MoreHorizontal size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
-        {/* Right column */}
-        <div className="dash-right">
-          {/* Acquirers — My card equivalent */}
-          <div className="card fade-up d2">
+        {/* Formas de conversão — alinhado com a 4ª coluna dos KPIs */}
+        <div className="dash-conv-col">
+          <div className="card card-formas-conversao fade-up d2">
             <div className="card-head">
-              <div>
-                <p className="card-title">Status dos Adquirentes</p>
-                <p className="card-subtitle">6 integrações ativas</p>
-              </div>
-              <button className="btn btn-ghost btn-icon btn-sm" title="Atualizar">
-                <RefreshCw size={13} />
-              </button>
+              <p className="card-title">Formas de conversão</p>
             </div>
-            <div className="acq-list">
-              {ACQUIRERS.map((a) => (
-                <div key={a.name} className="acq-item">
-                  <span className={`acq-dot ${a.status}`} />
-                  <span className="acq-name">{a.name}</span>
-                  <span className="acq-lat">{a.lat}</span>
-                  <span className={`acq-status ${a.status}`}>
-                    {a.status === "online" ? "Online" : a.status === "offline" ? "Offline" : "Lento"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick stats */}
-          <div className="card fade-up d3">
-            <div className="card-head">
-              <p className="card-title">Resumo</p>
-            </div>
-            <div style={{ padding: "4px 0" }}>
-              {[
-                { label: "Taxa de aprovação",    value: "94,7%",   color: "var(--green)" },
-                { label: "Ticket médio",          value: "R$ 287",  color: "var(--accent)" },
-                { label: "Contestações abertas",  value: "3",       color: "var(--yellow)" },
-                { label: "Saques pendentes",      value: "1",       color: "var(--red)" },
-                { label: "Webhooks disparados",   value: "1.082",   color: "var(--text-1)" },
-                { label: "Uptime hoje",           value: "99,8%",   color: "var(--green)" },
-              ].map((s) => (
-                <div
-                  key={s.label}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "11px 20px",
-                    borderBottom: "1px solid var(--border-2)",
-                    transition: "background var(--dur)",
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-2)"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                >
-                  <span style={{ fontSize: 13, color: "var(--text-2)" }}>{s.label}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: s.color }}>{s.value}</span>
-                </div>
-              ))}
+            <div className="conv-bars conv-bars-full">
+              {FORMAS_CONVERSAO.map((item) =>
+                item.separator ? (
+                  <div key={item.id} className="conv-sep" />
+                ) : (
+                  <div key={item.id} className="conv-bar-block">
+                    <div className="conv-bar-header">
+                      <span className="conv-bar-label">{item.label}</span>
+                      <span className="conv-bar-pct">{item.pct}%</span>
+                    </div>
+                    <div className="conv-bar-track conv-bar-track-thick">
+                      <div
+                        className="conv-bar-fill"
+                        style={{ width: `${item.pct}%`, background: item.barColor }}
+                      />
+                    </div>
+                  </div>
+                )
+              )}
             </div>
           </div>
         </div>
