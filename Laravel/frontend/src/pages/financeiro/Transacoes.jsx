@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   CheckCircle2, Clock, XCircle, RotateCcw, MoreHorizontal,
-  Search, FileText, Download, X,
+  Search, FileText, Download, X, Loader2,
 } from "lucide-react";
 import { Paginacao } from "../../components/Paginacao";
 import logoImg from "../../assets/logo.webp";
@@ -10,23 +10,35 @@ import { formatDateTimeBR } from "../../utils/date";
 
 /* Mapeia status da API para o usado na UI */
 const API_STATUS_MAP = { PAID: "aprovado", PENDING: "pendente", CANCELLED: "falhou", REVERSED: "estornado" };
-function mapApiTxToRow(api) {
-  const status = API_STATUS_MAP[api.status] ?? "pendente";
-  const data = formatDateTimeBR(api.created_at);
+
+function mapApiTxToRow(api, detail = null) {
+  const src    = detail ?? api;
+  const status = API_STATUS_MAP[src.status] ?? "pendente";
+  const data   = formatDateTimeBR(src.created_at);
+
   return {
-    id: String(api.id),
-    tipo: api.type_label ?? api.type ?? "—",
-    cliente: api.nome ?? api.descricao ?? "—",
-    valor: parseFloat(api.amount) || 0,
+    id:        String(src.id),
+    tipo:      src.type_label ?? src.type ?? "—",
+    cliente:   src.nome ?? src.descricao ?? "—",
+    valor:     parseFloat(src.amount) || 0,
+    taxa:      parseFloat(src.tax) || 0,
+    liquido:   parseFloat(src.net_amount ?? src.amount) || 0,
     status,
     data,
-    nome: api.nome,
-    descricao: api.descricao,
-    created_at: api.created_at,
-    pagador: { nome: api.nome ?? "—", cpfCnpj: "—", telegram: "—" },
+    nome:      src.nome,
+    descricao: src.descricao,
+    created_at:    src.created_at,
+    confirmed_at:  src.confirmed_at,
+    external_id:   src.external_id ?? null,
+    end2end:       src.end2end ?? null,
+    pagador: {
+      nome:    src.nome ?? "—",
+      cpfCnpj: src.document ?? "—",
+      telegram: "—",
+    },
     recebedor: { nome: "—", cpfCnpj: "—", instituicao: "—", chavePix: "—" },
-    autenticacao: String(api.id),
-    identificacao: api.id ?? "—",
+    autenticacao:  src.end2end     ?? src.external_id ?? String(src.id),
+    identificacao: src.external_id ?? String(src.id),
     geradoEm: data,
   };
 }
@@ -98,25 +110,26 @@ function gerarHTMLComprovante(tx) {
   </div>
 
   <div class="dt-row">
-    <span class="dt-lbl">Pagamento realizado</span>
+    <span class="dt-lbl">${tx.confirmed_at ? "Confirmado em" : "Criado em"}</span>
     <span class="dt-val">${tx.data}</span>
   </div>
 
   <div class="body">
+    <p class="sec-title">Valores</p>
+    ${row("Valor bruto", fmt(tx.valor))}
+    ${tx.taxa > 0 ? row("Taxa", "− " + fmt(tx.taxa)) : ""}
+    ${tx.taxa > 0 ? row("Valor líquido", fmt(tx.liquido)) : ""}
+    ${sep}
     <p class="sec-title">Quem pagou</p>
     ${row("Nome", tx.pagador.nome)}
     ${tx.pagador.telegram !== "—" ? row("Telegram", tx.pagador.telegram) : ""}
-    ${row("CPF/CNPJ", tx.pagador.cpfCnpj)}
+    ${tx.pagador.cpfCnpj !== "—" ? row("CPF/CNPJ", tx.pagador.cpfCnpj) : ""}
     ${sep}
-    <p class="sec-title">Quem recebeu</p>
-    ${row("Nome", tx.recebedor.nome)}
-    ${row("CPF/CNPJ", tx.recebedor.cpfCnpj)}
-    ${row("Instituição", tx.recebedor.instituicao)}
-    ${tx.recebedor.chavePix !== "—" ? row("Chave Pix", tx.recebedor.chavePix) : ""}
-    ${sep}
+    ${tx.descricao ? `<p class="sec-title">Descrição</p>${row("Descrição", tx.descricao)}${sep}` : ""}
     <p class="sec-title">Autenticação</p>
-    <div class="hash-block"><p class="hash-lbl">Autenticação</p><p class="hash-val">${tx.autenticacao}</p></div>
-    <div class="hash-block"><p class="hash-lbl">Identificação</p><p class="hash-val">${tx.identificacao}</p></div>
+    ${tx.end2end    ? `<div class="hash-block"><p class="hash-lbl">End2End</p><p class="hash-val">${tx.end2end}</p></div>` : ""}
+    ${tx.external_id ? `<div class="hash-block"><p class="hash-lbl">ID Externo</p><p class="hash-val">${tx.external_id}</p></div>` : ""}
+    <div class="hash-block"><p class="hash-lbl">ID Transação</p><p class="hash-val">${tx.id}</p></div>
   </div>
 
   <div class="foot">
@@ -236,33 +249,57 @@ function ModalComprovante({ tx, onClose }) {
           padding: "9px 22px",
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontSize: 11, color: R.t3 }}>Pagamento realizado</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: R.t2 }}>{tx.data}</span>
+          <span style={{ fontSize: 11, color: R.t3 }}>
+            {tx.confirmed_at ? "Confirmado em" : "Criado em"}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: R.t2 }}>
+            {formatDateTimeBR(tx.confirmed_at ?? tx.created_at)}
+          </span>
         </div>
 
         {/* ── Corpo ── */}
         <div style={{ overflowY: "auto", flex: 1, padding: "0 22px 4px" }}>
 
+          {/* Resumo financeiro */}
+          <RSecLabel label="Valores" />
+          <RRow label="Valor bruto" value={fmt(tx.valor)} />
+          {tx.taxa > 0 && <RRow label="Taxa"       value={`− ${fmt(tx.taxa)}`} />}
+          {tx.taxa > 0 && <RRow label="Valor líquido" value={fmt(tx.liquido)} />}
+
+          <RSep />
+
           <RSecLabel label="Quem pagou" />
           <RRow label="Nome"     value={tx.pagador.nome}    />
           {tx.pagador.telegram !== "—" && <RRow label="Telegram" value={tx.pagador.telegram} />}
-          <RRow label="CPF/CNPJ" value={tx.pagador.cpfCnpj} />
+          {tx.pagador.cpfCnpj !== "—" && <RRow label="CPF/CNPJ" value={tx.pagador.cpfCnpj} />}
 
           <RSep />
 
-          <RSecLabel label="Quem recebeu" />
-          <RRow label="Nome"        value={tx.recebedor.nome}        />
-          <RRow label="CPF/CNPJ"    value={tx.recebedor.cpfCnpj}     />
-          <RRow label="Instituição" value={tx.recebedor.instituicao} />
-          {tx.recebedor.chavePix !== "—" && <RRow label="Chave Pix" value={tx.recebedor.chavePix} />}
+          {(tx.recebedor.nome !== "—" || tx.recebedor.chavePix !== "—") && (
+            <>
+              <RSecLabel label="Quem recebeu" />
+              {tx.recebedor.nome        !== "—" && <RRow label="Nome"        value={tx.recebedor.nome}        />}
+              {tx.recebedor.cpfCnpj     !== "—" && <RRow label="CPF/CNPJ"    value={tx.recebedor.cpfCnpj}     />}
+              {tx.recebedor.instituicao !== "—" && <RRow label="Instituição" value={tx.recebedor.instituicao} />}
+              {tx.recebedor.chavePix    !== "—" && <RRow label="Chave Pix"   value={tx.recebedor.chavePix}    />}
+              <RSep />
+            </>
+          )}
 
-          <RSep />
+          {tx.descricao && (
+            <>
+              <RSecLabel label="Descrição" />
+              <RRow label="Descrição" value={tx.descricao} />
+              <RSep />
+            </>
+          )}
 
           <RSecLabel label="Autenticação" />
           {[
-            { l: "Autenticação",  v: tx.autenticacao  },
-            { l: "Identificação", v: tx.identificacao  },
-          ].map(({ l, v }) => (
+            { l: "End2End",       v: tx.end2end     },
+            { l: "ID Externo",    v: tx.external_id },
+            { l: "ID Transação",  v: tx.id          },
+          ].filter(({ v }) => v).map(({ l, v }) => (
             <div key={l} style={{ marginBottom: 8 }}>
               <p style={{ fontSize: 10, color: R.t4, marginBottom: 3, textTransform: "uppercase", letterSpacing: ".04em" }}>{l}</p>
               <p style={{
@@ -312,7 +349,8 @@ function ModalComprovante({ tx, onClose }) {
 
 /* ─── Menu de ações (3 pontinhos) ───────────────────────────── */
 function MenuAcoes({ tx, onComprovante }) {
-  const [aberto, setAberto] = useState(false);
+  const [aberto,    setAberto]    = useState(false);
+  const [buscando,  setBuscando]  = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -322,10 +360,30 @@ function MenuAcoes({ tx, onComprovante }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [aberto]);
 
+  const abrirComprovante = async () => {
+    setAberto(false);
+    setBuscando(true);
+    try {
+      const res  = await apiJson(`/transactions/${tx.id}`);
+      const data = res?.data ?? res;
+      onComprovante(mapApiTxToRow(data, data));
+    } catch {
+      // fallback: usa dados já disponíveis na lista
+      onComprovante(tx);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button className="btn btn-ghost btn-icon btn-xs" onClick={() => setAberto((v) => !v)} title="Ações">
-        <MoreHorizontal size={14} />
+      <button
+        className="btn btn-ghost btn-icon btn-xs"
+        onClick={() => setAberto((v) => !v)}
+        disabled={buscando}
+        title="Ações"
+      >
+        {buscando ? <Loader2 size={14} className="spin" /> : <MoreHorizontal size={14} />}
       </button>
       {aberto && (
         <div style={{
@@ -337,7 +395,7 @@ function MenuAcoes({ tx, onComprovante }) {
         }}>
           <button
             className="tb-dropdown-item"
-            onClick={() => { setAberto(false); onComprovante(tx); }}
+            onClick={abrirComprovante}
             style={{ fontSize: 13 }}
           >
             <FileText size={13} /> Comprovante

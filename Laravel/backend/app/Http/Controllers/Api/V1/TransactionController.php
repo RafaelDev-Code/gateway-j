@@ -28,7 +28,7 @@ class TransactionController extends Controller
     {
         $transaction = Transaction::where('id', $id)
             ->where('user_id', $request->user()->id)
-            ->select(['id', 'status', 'type', 'amount', 'tax', 'nome', 'descricao', 'created_at', 'confirmed_at'])
+            ->select(['id', 'status', 'type', 'amount', 'tax', 'nome', 'document', 'descricao', 'external_id', 'end2end', 'created_at', 'confirmed_at'])
             ->firstOrFail();
 
         return response()->json(new TransactionResource($transaction));

@@ -24,7 +24,10 @@ class TransactionResource extends JsonResource
             'tax'          => bcdiv((string) (int) $this->tax, '100', 2),
             'net_amount'   => bcdiv((string) $this->netAmount(), '100', 2),
             'nome'         => $this->nome,
+            'document'     => $this->when($this->getAttribute('document') !== null, $this->document),
             'descricao'    => $this->descricao,
+            'external_id'  => $this->when($this->getAttribute('external_id') !== null, $this->external_id),
+            'end2end'      => $this->when($this->getAttribute('end2end') !== null, $this->end2end),
             'created_at'   => $this->created_at?->toIso8601String(),
             'confirmed_at' => $this->confirmed_at?->toIso8601String(),
 
