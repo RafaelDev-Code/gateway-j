@@ -71,7 +71,8 @@ class DocumentController extends Controller
 
         Storage::disk('private')->put($storagePath, file_get_contents($file->getRealPath()));
 
-        $document = UserDocument::create([
+        // forceFill para incluir status (campo protegido via $fillable)
+        $document = (new UserDocument())->forceFill([
             'user_id'          => $user->id,
             'type'             => $type,
             'file_path'        => $storagePath,
@@ -81,6 +82,7 @@ class DocumentController extends Controller
             'status'           => DocumentStatus::PENDING,
             'rejection_reason' => null,
         ]);
+        $document->save();
 
         AuditLog::create([
             'user_id'    => $user->id,

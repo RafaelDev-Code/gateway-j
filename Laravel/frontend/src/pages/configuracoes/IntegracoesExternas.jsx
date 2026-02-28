@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Webhook, KeyRound, BarChart2, ShoppingCart,
   CheckCircle2, XCircle, ExternalLink, Copy, Check,
   RefreshCw, Eye, EyeOff, X, Plus, Trash2,
-  BookOpen, ChevronRight, AlertCircle,
+  BookOpen, ChevronRight, AlertCircle, Loader2,
 } from "lucide-react";
+import { apiJson } from "../../api/client";
+import { formatDateShort } from "../../utils/date";
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -30,39 +32,67 @@ function CopyBtn({ value }) {
 ═══════════════════════════════════════════════════════════════ */
 const MAX_CREDS = 5;
 
-const CREDS_INIT = [
-  { id: uid(), nome: "Produção", key: gerarApiKey(), secret: gerarApiSecret(), criado: "15/01/2026" },
-];
-
 function CredenciaisCard() {
-  const [creds,       setCreds]       = useState(CREDS_INIT);
-  const [modalNova,   setModalNova]   = useState(false);
-  const [modalVer,    setModalVer]    = useState(null);   // cred recém-criada
-  const [confirmDel,  setConfirmDel]  = useState(null);
-  const [nomeNova,    setNomeNova]    = useState("");
+  const [creds, setCreds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modalNova, setModalNova] = useState(false);
+  const [modalVer, setModalVer] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [nomeNova, setNomeNova] = useState("");
+  const [criando, setCriando] = useState(false);
+  const [err, setErr] = useState("");
 
-  const criar = () => {
-    if (!nomeNova.trim() || creds.length >= MAX_CREDS) return;
-    const nova = { id: uid(), nome: nomeNova.trim(), key: gerarApiKey(), secret: gerarApiSecret(), criado: new Date().toLocaleDateString("pt-BR") };
-    setCreds((p) => [...p, nova]);
-    setNomeNova("");
-    setModalNova(false);
-    setModalVer(nova);
+  const load = () => {
+    setLoading(true);
+    apiJson("/keys")
+      .then((r) => {
+        const data = Array.isArray(r?.data) ? r.data : [];
+        setCreds(data.map((k) => ({ id: String(k.id), nome: k.name || "—", key: k.client_id || "", secret: null, criado: formatDateShort(k.created_at) })));
+      })
+      .catch(() => setCreds([]))
+      .finally(() => setLoading(false));
   };
 
-  const excluir = (id) => {
-    setCreds((p) => p.filter((c) => c.id !== id));
-    setConfirmDel(null);
+  useEffect(() => load(), []);
+
+  const criar = async () => {
+    if (!nomeNova.trim() || creds.length >= MAX_CREDS) return;
+    setErr("");
+    setCriando(true);
+    try {
+      const res = await apiJson("/keys", { method: "POST", body: JSON.stringify({ name: nomeNova.trim() }) });
+      const d = res?.data;
+      const nova = { id: String(d?.id), nome: d?.name || nomeNova.trim(), key: d?.client_id || "", secret: d?.client_secret || null, criado: formatDateShort(d?.created_at) };
+      setCreds((p) => [nova, ...p]);
+      setNomeNova("");
+      setModalNova(false);
+      setModalVer(nova);
+    } catch (e) {
+      setErr(e?.data?.message || e?.message || "Falha ao criar credencial.");
+    } finally {
+      setCriando(false);
+    }
+  };
+
+  const excluir = async (id) => {
+    try {
+      await apiJson(`/keys/${id}`, { method: "DELETE" });
+      setCreds((p) => p.filter((c) => c.id !== id));
+      setConfirmDel(null);
+    } catch (_) {}
   };
 
   return (
     <div>
       {/* Lista */}
       <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid var(--border-2)", borderRadius: "var(--radius-sm)", overflow: "hidden", marginBottom: 12 }}>
-        {creds.length === 0 && (
+        {loading && (
+          <p style={{ padding: "16px", fontSize: 12, color: "var(--text-3)", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><Loader2 size={14} className="spin" /> Carregando...</p>
+        )}
+        {!loading && creds.length === 0 && (
           <p style={{ padding: "16px", fontSize: 12, color: "var(--text-3)", textAlign: "center" }}>Nenhuma credencial criada.</p>
         )}
-        {creds.map((c, i) => (
+        {!loading && creds.map((c, i) => (
           <div key={c.id}>
             <div style={{
               display: "flex", alignItems: "center", gap: 12,
@@ -135,23 +165,24 @@ function CredenciaisCard() {
               <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setModalNova(false)}><X size={16} /></button>
             </div>
             <div className="modal-body">
+              {err && <p className="field-error">{err}</p>}
               <label className="form-label">Nome da credencial</label>
               <input
                 className="form-input"
                 placeholder="Ex: Produção, Homologação, App Mobile..."
                 value={nomeNova}
-                onChange={(e) => setNomeNova(e.target.value)}
+                onChange={(e) => { setNomeNova(e.target.value); setErr(""); }}
                 onKeyDown={(e) => e.key === "Enter" && criar()}
                 autoFocus
               />
               <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 6 }}>
-                A API Key e o Secret serão gerados automaticamente. O Secret só será exibido uma vez.
+                O Client ID e o Secret serão gerados. O Secret só será exibido uma vez.
               </p>
             </div>
             <div className="modal-footer">
               <button className="btn btn-ghost btn-sm" onClick={() => setModalNova(false)}>Cancelar</button>
-              <button className="btn btn-primary btn-sm" style={{ gap: 5 }} disabled={!nomeNova.trim()} onClick={criar}>
-                <KeyRound size={13} /> Gerar chaves
+              <button className="btn btn-primary btn-sm" style={{ gap: 5 }} disabled={!nomeNova.trim() || criando} onClick={criar}>
+                {criando ? <><Loader2 size={13} className="spin" /> Criando...</> : <><KeyRound size={13} /> Gerar chaves</>}
               </button>
             </div>
           </div>
@@ -220,40 +251,94 @@ const TODOS_EVENTOS = [
   { id: "withdraw.failed",    label: "Saque recusado"       },
 ];
 
-const HOOKS_INIT = [
-  { id: uid(), url: "https://meusite.com/webhook/pagamentos", ativo: true,  eventos: ["payment.approved", "payment.failed"] },
-];
-
 function WebhooksCard() {
-  const [hooks,      setHooks]      = useState(HOOKS_INIT);
+  const [hooks,      setHooks]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
   const [modal,      setModal]      = useState(false);
   const [confirmDel, setConfirmDel] = useState(null);
+  const [salvando,   setSalvando]   = useState(false);
+  const [formErr,    setFormErr]    = useState("");
 
   /* form do modal */
   const [formUrl,     setFormUrl]     = useState("");
   const [formEventos, setFormEventos] = useState([]);
 
-  const abrirModal = () => { setFormUrl(""); setFormEventos([]); setModal(true); };
+  const load = () => {
+    setLoading(true);
+    apiJson("/user-webhooks")
+      .then((r) => {
+        const list = Array.isArray(r?.data) ? r.data : [];
+        setHooks(list.map((h) => ({
+          id:     h.id,
+          url:    h.url,
+          ativo:  h.is_active,
+          eventos: Array.isArray(h.events) ? h.events : [],
+        })));
+      })
+      .catch(() => setHooks([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => load(), []);
+
+  const abrirModal = () => { setFormUrl(""); setFormEventos([]); setFormErr(""); setModal(true); };
 
   const toggleEvento = (id) =>
     setFormEventos((p) => p.includes(id) ? p.filter((e) => e !== id) : [...p, id]);
 
-  const salvar = () => {
-    if (!formUrl.trim() || formEventos.length === 0 || hooks.length >= MAX_HOOKS) return;
-    setHooks((p) => [...p, { id: uid(), url: formUrl.trim(), ativo: true, eventos: formEventos }]);
-    setModal(false);
+  const salvar = async () => {
+    if (!formUrl.trim() || formEventos.length === 0 || hooks.length >= MAX_HOOKS || salvando) return;
+    setSalvando(true);
+    setFormErr("");
+    try {
+      const r = await apiJson("/user-webhooks", {
+        method: "POST",
+        body: { url: formUrl.trim(), events: formEventos },
+      });
+      const h = r?.data;
+      if (h) {
+        setHooks((p) => [...p, { id: h.id, url: h.url, ativo: h.is_active, eventos: h.events ?? [] }]);
+      }
+      setModal(false);
+    } catch (err) {
+      setFormErr(err?.errors?.url?.[0] || err?.errors?.events?.[0] || err?.message || "Erro ao salvar.");
+    } finally {
+      setSalvando(false);
+    }
   };
 
-  const toggleAtivo = (id) =>
-    setHooks((p) => p.map((h) => h.id === id ? { ...h, ativo: !h.ativo } : h));
+  const toggleAtivo = async (id) => {
+    const hook = hooks.find((h) => h.id === id);
+    if (!hook) return;
+    const novoAtivo = !hook.ativo;
+    setHooks((p) => p.map((h) => h.id === id ? { ...h, ativo: novoAtivo } : h));
+    try {
+      await apiJson(`/user-webhooks/${id}`, { method: "PATCH", body: { is_active: novoAtivo } });
+    } catch {
+      setHooks((p) => p.map((h) => h.id === id ? { ...h, ativo: hook.ativo } : h));
+    }
+  };
 
-  const excluir = (id) => { setHooks((p) => p.filter((h) => h.id !== id)); setConfirmDel(null); };
+  const excluir = async (id) => {
+    setHooks((p) => p.filter((h) => h.id !== id));
+    setConfirmDel(null);
+    try {
+      await apiJson(`/user-webhooks/${id}`, { method: "DELETE" });
+    } catch {
+      load();
+    }
+  };
 
   return (
     <div>
       {/* Lista */}
       <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid var(--border-2)", borderRadius: "var(--radius-sm)", overflow: "hidden", marginBottom: 12 }}>
-        {hooks.length === 0 && (
+        {loading && hooks.length === 0 && (
+          <p style={{ padding: "16px", fontSize: 12, color: "var(--text-3)", textAlign: "center" }}>
+            <Loader2 size={13} className="spin" style={{ marginRight: 6 }} /> Carregando...
+          </p>
+        )}
+        {!loading && hooks.length === 0 && (
           <p style={{ padding: "16px", fontSize: 12, color: "var(--text-3)", textAlign: "center" }}>Nenhum webhook cadastrado.</p>
         )}
         {hooks.map((h, i) => (
@@ -317,14 +402,14 @@ function WebhooksCard() {
 
       {/* Modal novo webhook */}
       {modal && (
-        <div className="modal-backdrop" onClick={() => setModal(false)}>
+        <div className="modal-backdrop" onClick={() => { if (!salvando) setModal(false); }}>
           <div className="modal-box" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <div>
                 <p className="modal-titulo">Novo webhook</p>
                 <p className="modal-subtitulo">Configure a URL e selecione os eventos.</p>
               </div>
-              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setModal(false)}><X size={16} /></button>
+              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setModal(false)} disabled={salvando}><X size={16} /></button>
             </div>
             <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
@@ -335,6 +420,7 @@ function WebhooksCard() {
                   value={formUrl}
                   onChange={(e) => setFormUrl(e.target.value)}
                   autoFocus
+                  disabled={salvando}
                 />
               </div>
 
@@ -373,16 +459,17 @@ function WebhooksCard() {
                   })}
                 </div>
               </div>
+              {formErr && <p style={{ fontSize: 12, color: "var(--red)" }}>{formErr}</p>}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost btn-sm" onClick={() => setModal(false)}>Cancelar</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setModal(false)} disabled={salvando}>Cancelar</button>
               <button
                 className="btn btn-primary btn-sm"
                 style={{ gap: 5 }}
-                disabled={!formUrl.trim() || formEventos.length === 0}
+                disabled={!formUrl.trim() || formEventos.length === 0 || salvando}
                 onClick={salvar}
               >
-                <Webhook size={13} /> Salvar webhook
+                {salvando ? <Loader2 size={13} className="spin" /> : <Webhook size={13} />} Salvar webhook
               </button>
             </div>
           </div>

@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FileText, Camera, Upload, CheckCircle2, X,
   ArrowRight, ArrowLeft, ShieldCheck, Globe,
   Briefcase, TrendingUp, Clock, LayoutDashboard, Check,
+  Loader2,
 } from "lucide-react";
+import { apiJson, apiRequest } from "../../api/client";
+import { formatDateBR } from "../../utils/date";
 
 /* ─── Etapa 1 — Documentos ─────────────────────────────────── */
 const DOCS = [
@@ -51,14 +54,29 @@ const TICKETS = [
 
 export function KYC() {
   const navigate = useNavigate();
-  const [step,     setStep]    = useState(0); // 0 = docs, 1 = negócio, 2 = aguardar
-  const [files,    setFiles]   = useState({});
-  const [dragOver, setDragOver]= useState(null);
-  const [fileErr,  setFileErr] = useState({});
-  const [negocio,  setNegocio] = useState({ nicho: "", ticket: "", site: "" });
+  const [step, setStep] = useState(0);
+  const [files, setFiles] = useState({});
+  const [dragOver, setDragOver] = useState(null);
+  const [fileErr, setFileErr] = useState({});
+  const [uploading, setUploading] = useState({});
+  const [documentsList, setDocumentsList] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(true);
+  const [negocio, setNegocio] = useState({ nicho: "", ticket: "", site: "" });
 
-  /* ── Handlers de arquivo ─────────────────────────────────── */
-  const addFile = (id, file) => {
+  useEffect(() => {
+    apiJson("/documents")
+      .then((r) => setDocumentsList(Array.isArray(r?.data) ? r.data : []))
+      .catch(() => setDocumentsList([]))
+      .finally(() => setLoadingDocs(false));
+  }, []);
+
+  const docsByType = documentsList.reduce((acc, d) => {
+    if (!acc[d.type]) acc[d.type] = [];
+    acc[d.type].push(d);
+    return acc;
+  }, {});
+
+  const addFile = async (id, file) => {
     if (!file) return;
     if (!ACCEPT_TYPES.includes(file.type)) {
       setFileErr((e) => ({ ...e, [id]: "Formato inválido. Use JPG, PNG ou PDF." }));
@@ -69,17 +87,36 @@ export function KYC() {
       return;
     }
     setFileErr((e) => { const n = { ...e }; delete n[id]; return n; });
-    setFiles((p) => ({ ...p, [id]: file }));
+    setUploading((u) => ({ ...u, [id]: true }));
+    const form = new FormData();
+    form.append("type", id);
+    form.append("file", file);
+    try {
+      const res = await apiRequest("/documents", { method: "POST", body: form });
+      if (!res.ok) {
+        const text = await res.text();
+        throw { data: text ? JSON.parse(text) : {} };
+      }
+      const listRes = await apiJson("/documents");
+      setDocumentsList(Array.isArray(listRes?.data) ? listRes.data : []);
+      setFiles((p) => { const n = { ...p }; delete n[id]; return n; });
+    } catch (err) {
+      setFileErr((e) => ({ ...e, [id]: err?.data?.message || err?.message || "Falha ao enviar." }));
+    } finally {
+      setUploading((u) => ({ ...u, [id]: false }));
+    }
   };
 
-  const removeFile = (id) =>
-    setFiles((p) => { const n = { ...p }; delete n[id]; return n; });
+  const removeFile = (id) => setFiles((p) => { const n = { ...p }; delete n[id]; return n; });
 
-  /* ── Derivados ───────────────────────────────────────────── */
-  const allDocsUploaded = DOCS.every((d) => files[d.id]);
-  const canFinish       = negocio.nicho && negocio.ticket;
-
-  const pct = Math.round((Object.keys(files).length / DOCS.length) * 100);
+  const allDocsUploaded = DOCS.every((d) =>
+    (docsByType[d.id] || []).some((doc) => doc.status === "PENDING" || doc.status === "APPROVED")
+  );
+  const canFinish = negocio.nicho && negocio.ticket;
+  const uploadedCount = DOCS.filter((d) =>
+    (docsByType[d.id] || []).some((doc) => doc.status === "PENDING" || doc.status === "APPROVED")
+  ).length;
+  const pct = Math.min(100, Math.round((uploadedCount / DOCS.length) * 100));
 
   const setN = (k) => (e) => setNegocio((n) => ({ ...n, [k]: e.target.value }));
 
@@ -140,63 +177,68 @@ export function KYC() {
               <div className="kyc-progress-fill" style={{ width: `${pct}%` }} />
             </div>
             <span className="kyc-progress-label">
-              {Object.keys(files).length}/{DOCS.length} enviados
+              {uploadedCount}/{DOCS.length} enviados
             </span>
           </div>
 
           {/* Lista de documentos */}
           <div className="kyc-doc-list">
-            {DOCS.map((doc, idx) => {
-              const file = files[doc.id];
-              const over = dragOver === doc.id;
-              const err  = fileErr[doc.id];
-              const Icon = doc.icon;
+            {loadingDocs ? (
+              <p style={{ padding: 24, textAlign: "center", color: "var(--text-3)" }}>Carregando documentos...</p>
+            ) : (
+              DOCS.map((doc, idx) => {
+                const file = files[doc.id];
+                const over = dragOver === doc.id;
+                const err = fileErr[doc.id];
+                const uploadingDoc = uploading[doc.id];
+                const list = docsByType[doc.id] || [];
+                const latest = list[0];
+                const statusLabel = latest && { PENDING: "Pendente", APPROVED: "Aprovado", REJECTED: "Rejeitado" }[latest.status];
+                const isDone = latest && (latest.status === "PENDING" || latest.status === "APPROVED");
+                const Icon = doc.icon;
 
-              return (
-                <div
-                  key={doc.id}
-                  className={`kyc-doc-row${file ? " kyc-doc-done" : ""}${over ? " kyc-doc-drag" : ""}`}
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(doc.id); }}
-                  onDragLeave={() => setDragOver(null)}
-                  onDrop={(e) => { e.preventDefault(); setDragOver(null); addFile(doc.id, e.dataTransfer.files[0]); }}
-                >
-                  {/* Número + ícone */}
-                  <div className="kyc-doc-num">
-                    {file
-                      ? <CheckCircle2 size={16} style={{ color: "var(--green)" }} />
-                      : <span>{idx + 1}</span>}
+                return (
+                  <div
+                    key={doc.id}
+                    className={`kyc-doc-row${file || isDone ? " kyc-doc-done" : ""}${over ? " kyc-doc-drag" : ""}`}
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(doc.id); }}
+                    onDragLeave={() => setDragOver(null)}
+                    onDrop={(e) => { e.preventDefault(); setDragOver(null); if (!isDone) addFile(doc.id, e.dataTransfer.files[0]); }}
+                  >
+                    <div className="kyc-doc-num">
+                      {file || isDone ? <CheckCircle2 size={16} style={{ color: "var(--green)" }} /> : <span>{idx + 1}</span>}
+                    </div>
+                    <div className="kyc-doc-info">
+                      <p className="kyc-doc-label">{doc.label}</p>
+                      <p className="kyc-doc-desc">
+                        {latest ? (statusLabel + (latest.created_at ? " · " + formatDateBR(latest.created_at) : "")) : file ? file.name : doc.desc}
+                      </p>
+                      {latest?.status === "REJECTED" && latest?.rejection_reason && (
+                        <p className="field-error" style={{ marginTop: 4 }}>{latest.rejection_reason}</p>
+                      )}
+                      {err && <p className="field-error" style={{ marginTop: 2 }}>{err}</p>}
+                    </div>
+                    <div className="kyc-doc-action">
+                      {uploadingDoc ? (
+                        <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-3)" }}><Loader2 size={14} className="spin" /> Enviando...</span>
+                      ) : file ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span className="kyc-doc-size">{(file.size / 1024).toFixed(0)} KB</span>
+                          <button className="kyc-remove-btn" onClick={() => removeFile(doc.id)} title="Remover"><X size={13} /></button>
+                        </div>
+                      ) : isDone ? (
+                        <span style={{ fontSize: 12, color: "var(--green)", fontWeight: 500 }}>{statusLabel}</span>
+                      ) : (
+                        <label className="kyc-upload-btn">
+                          <Upload size={13} /><span>Enviar</span>
+                          <input type="file" accept={ACCEPT} style={{ display: "none" }} onChange={(e) => addFile(doc.id, e.target.files[0])} />
+                        </label>
+                      )}
+                    </div>
                   </div>
-
-                  {/* Info */}
-                  <div className="kyc-doc-info">
-                    <p className="kyc-doc-label">{doc.label}</p>
-                    <p className="kyc-doc-desc">
-                      {file ? file.name : doc.desc}
-                    </p>
-                    {err && <p className="field-error" style={{ marginTop: 2 }}>{err}</p>}
-                  </div>
-
-                  {/* Ação */}
-                  <div className="kyc-doc-action">
-                    {file ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span className="kyc-doc-size">{(file.size / 1024).toFixed(0)} KB</span>
-                        <button className="kyc-remove-btn" onClick={() => removeFile(doc.id)} title="Remover">
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="kyc-upload-btn">
-                        <Upload size={13} />
-                        <span>Enviar</span>
-                        <input type="file" accept={ACCEPT} style={{ display: "none" }}
-                          onChange={(e) => addFile(doc.id, e.target.files[0])} />
-                      </label>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
 
           {/* Info de formatos */}

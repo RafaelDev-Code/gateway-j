@@ -38,13 +38,14 @@ class SendPostbackJob implements ShouldQueue
             return;
         }
 
+        // Converte centavos para reais via bcmath — nunca float
         $payload = [
             'id'           => $transaction->id,
             'status'       => $transaction->status->value,
             'type'         => $transaction->type->value,
-            'amount'       => number_format((float) $transaction->amount, 2, '.', ''),
-            'tax'          => number_format((float) $transaction->tax, 2, '.', ''),
-            'net_amount'   => number_format($transaction->netAmount(), 2, '.', ''),
+            'amount'       => bcdiv((string) (int) $transaction->amount, '100', 2),
+            'tax'          => bcdiv((string) (int) $transaction->tax, '100', 2),
+            'net_amount'   => bcdiv((string) $transaction->netAmount(), '100', 2),
             'confirmed_at' => $transaction->confirmed_at?->toIso8601String(),
         ];
 

@@ -28,12 +28,12 @@ class GeneratePixAction
             throw new \RuntimeException('Cash-in nao disponivel para este usuario.');
         }
 
-        if (! $this->antiFraud->isAmountValid($dto->amount)) {
+        if (! $this->antiFraud->isAmountValid($dto->amountCents)) {
             throw new \RuntimeException('Valor invalido para transacao.');
         }
 
-        // Calcula taxa
-        $tax = $this->taxCalculator->calculateCashIn($dto->user, $dto->amount);
+        // Calcula taxa em centavos
+        $taxCents = $this->taxCalculator->calculateCashIn($dto->user, $dto->amountCents);
 
         // Obtem adquirente do usuario
         $acquirer = AcquirerFactory::make($dto->user->payment_pix);
@@ -46,23 +46,24 @@ class GeneratePixAction
         }
 
         // Persiste tudo em uma transacao atomica
-        $transaction = DB::transaction(function () use ($dto, $tax, $acquirerResult) {
+        $transaction = DB::transaction(function () use ($dto, $taxCents, $acquirerResult) {
             $txId = config('gateway.transaction_prefix', 'e') . Str::random(32);
 
-            $transaction = Transaction::create([
-                'id'          => $txId,
-                'external_id' => $acquirerResult['external_id'],
-                'user_id'     => $dto->user->id,
-                'amount'      => $dto->amount,
-                'tax'         => $tax,
-                'status'      => TransactionStatus::PENDING,
-                'type'        => TransactionType::DEPOSIT,
-                'nome'        => $dto->payerName,
-                'document'    => $dto->payerDocument,
-                'descricao'   => $dto->description,
-                'postback_url'=> $dto->postbackUrl,
-                'is_api'      => $dto->isApi,
+            $transaction = (new Transaction())->forceFill([
+                'id'           => $txId,
+                'external_id'  => $acquirerResult['external_id'],
+                'user_id'      => $dto->user->id,
+                'amount'       => $dto->amountCents,
+                'tax'          => $taxCents,
+                'status'       => TransactionStatus::PENDING,
+                'type'         => TransactionType::DEPOSIT,
+                'nome'         => $dto->payerName,
+                'document'     => $dto->payerDocument,
+                'descricao'    => $dto->description,
+                'postback_url' => $dto->postbackUrl,
+                'is_api'       => $dto->isApi,
             ]);
+            $transaction->save();
 
             // Persiste splits se houver
             foreach ($dto->splits as $split) {

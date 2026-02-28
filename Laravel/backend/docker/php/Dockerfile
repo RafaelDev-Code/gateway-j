@@ -1,4 +1,4 @@
-FROM php:8.3-cli-alpine AS base
+FROM php:8.4-cli-alpine AS base
 
 # Instala dependencias do sistema
 RUN apk add --no-cache \
@@ -38,8 +38,8 @@ RUN pecl install swoole && docker-php-ext-enable swoole
 # Limpa cache de build
 RUN apk del $PHPIZE_DEPS && rm -rf /tmp/pear
 
-# Copia configuracoes PHP customizadas
-COPY docker/php/php.ini /usr/local/etc/php/conf.d/99-gateway.ini
+# Copia configuracoes PHP (sem disable_functions no base — restrito apenas em producao)
+COPY docker/php/php-base.ini /usr/local/etc/php/conf.d/99-gateway.ini
 
 # Instala Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -53,6 +53,9 @@ WORKDIR /var/www/html
 # Stage de producao
 # ============================================================
 FROM base AS production
+
+# Adiciona restricoes de seguranca apenas em producao
+COPY docker/php/php.ini /usr/local/etc/php/conf.d/100-prod-security.ini
 
 COPY --chown=gateway:gateway . .
 

@@ -1,0 +1,63 @@
+## docker-compose.local.yml
+## Setup completo para desenvolvimento local com PostgreSQL embutido.
+## Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.local.yml up -d
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: gateway_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gateway
+      POSTGRES_USER: gateway_user
+      POSTGRES_PASSWORD: gateway_pass_local
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway_user -d gateway"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gateway_internal
+
+  nginx:
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  octane:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/var/www/html
+      - ./docker/php/php-dev.ini:/usr/local/etc/php/conf.d/100-dev.ini
+
+  horizon:
+    volumes:
+      - .:/var/www/html
+      - ./docker/php/php-dev.ini:/usr/local/etc/php/conf.d/100-dev.ini
+
+  scheduler:
+    volumes:
+      - .:/var/www/html
+      - ./docker/php/php-dev.ini:/usr/local/etc/php/conf.d/100-dev.ini
+
+  redis:
+    command: >
+      redis-server
+      --requirepass redis_pass_local
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+
+volumes:
+  postgres_data:
+    driver: local

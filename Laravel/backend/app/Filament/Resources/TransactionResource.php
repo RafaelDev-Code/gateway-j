@@ -14,11 +14,11 @@ use Filament\Tables\Table;
 class TransactionResource extends Resource
 {
     protected static ?string $model = Transaction::class;
-    protected static ?string $navigationIcon  = 'heroicon-o-banknotes';
-    protected static ?string $navigationLabel = 'Transacoes';
-    protected static ?string $modelLabel      = 'Transacao';
-    protected static ?string $pluralModelLabel= 'Transacoes';
-    protected static ?int $navigationSort     = 2;
+    protected static ?string $navigationIcon   = 'heroicon-o-banknotes';
+    protected static ?string $navigationLabel  = 'Transações';
+    protected static ?string $modelLabel       = 'Transação';
+    protected static ?string $pluralModelLabel = 'Transações';
+    protected static ?int $navigationSort = 5;
 
     public static function form(Form $form): Form
     {

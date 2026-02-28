@@ -2,8 +2,11 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\AcquirersPage;
 use App\Filament\Resources\GatewayConfigResource;
 use App\Filament\Resources\IntegrationKeyResource;
+use App\Filament\Resources\KycApprovalResource;
+use App\Filament\Resources\ManagerResource;
 use App\Filament\Resources\TransactionResource;
 use App\Filament\Resources\UserDocumentResource;
 use App\Filament\Resources\UserResource;
@@ -34,33 +37,49 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path(env('ADMIN_URL_PREFIX', 'admin'))
             ->login()
+            ->brandName('')
             ->colors([
                 'primary' => Color::Rose,
             ])
-            ->brandName(config('gateway.name', 'Gateway Admin'))
 
+            // -------------------------------------------------------
             // Resources
+            // -------------------------------------------------------
             ->resources([
                 UserResource::class,
+                KycApprovalResource::class,
+                ManagerResource::class,
                 TransactionResource::class,
-                GatewayConfigResource::class,
                 IntegrationKeyResource::class,
                 UserDocumentResource::class,
+                GatewayConfigResource::class,
             ])
 
-            // Pages
+            // -------------------------------------------------------
+            // Pages customizadas
+            // -------------------------------------------------------
             ->pages([
                 Pages\Dashboard::class,
+                AcquirersPage::class,
             ])
 
+            // -------------------------------------------------------
             // Widgets do Dashboard
+            // -------------------------------------------------------
             ->widgets([
                 TransactionStatsWidget::class,
                 RevenueChartWidget::class,
                 RecentTransactionsWidget::class,
             ])
 
-            // Middleware de seguranca
+            // -------------------------------------------------------
+            // Grupos de navegação (sem ícones nos grupos para evitar conflito com ícones dos itens)
+            // -------------------------------------------------------
+            // ->navigationGroups([...]) removido: Filament exige ícone só no grupo OU nos itens, não em ambos.
+
+            // -------------------------------------------------------
+            // Middleware
+            // -------------------------------------------------------
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -75,8 +94,6 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-
-            // Protecao extra: apenas admins
             ->authGuard('web');
     }
 }

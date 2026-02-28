@@ -18,27 +18,37 @@ class TransactionFactory extends Factory
 
     public function definition(): array
     {
-        $amount = fake()->randomFloat(2, 10, 5000);
-        $tax    = round($amount * 0.015, 2);
+        // Valores em centavos (int) — consistente com o pipeline financeiro
+        $amountCents = fake()->numberBetween(1000, 500000); // R$10 a R$5000
+        $taxCents    = (int) round($amountCents * 0.015);
 
         return [
-            'id'             => strtoupper(Str::random(20)),
-            'end2end'        => null,
-            'external_id'    => Str::uuid()->toString(),
-            'user_id'        => User::factory(),
-            'amount'         => $amount,
-            'tax'            => $tax,
-            'status'         => TransactionStatus::PENDING,
-            'type'           => TransactionType::DEPOSIT,
-            'nome'           => fake()->name(),
-            'document'       => fake()->numerify('###########'),
-            'descricao'      => fake()->sentence(),
-            'postback_url'   => null,
-            'postback_status'=> 'PENDING',
-            'is_api'         => true,
-            'is_internal'    => false,
-            'confirmed_at'   => null,
+            'id'              => 'e' . strtolower(Str::random(32)),
+            'end2end'         => null,
+            'external_id'     => Str::uuid()->toString(),
+            'user_id'         => User::factory(),
+            'amount'          => $amountCents,
+            'tax'             => $taxCents,
+            'status'          => TransactionStatus::PENDING,
+            'type'            => TransactionType::DEPOSIT,
+            'nome'            => fake()->name(),
+            'document'        => fake()->numerify('###########'),
+            'descricao'       => fake()->sentence(),
+            'postback_url'    => null,
+            'postback_status' => 'PENDING',
+            'is_api'          => true,
+            'is_internal'     => false,
+            'confirmed_at'    => null,
         ];
+    }
+
+    /**
+     * forceFill necessário pois amount, tax, status, type e user_id estão em $guarded.
+     * Factories são código interno/confiável e devem usar forceFill().
+     */
+    public function newModel(array $attributes = []): Transaction
+    {
+        return (new Transaction())->forceFill($attributes);
     }
 
     public function paid(): static

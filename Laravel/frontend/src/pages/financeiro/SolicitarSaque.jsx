@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowUpRight, Wallet, AlertCircle, CheckCircle2,
-  Landmark, Info, Plus, X, Building2, Trash2,
+  Landmark, Info, Plus, X, Building2, Trash2, Loader2,
 } from "lucide-react";
+import { apiJson } from "../../api/client";
+import { formatDateShort } from "../../utils/date";
 
 /* ─── Estado inicial de contas ──────────────────────────────── */
 const BANCOS_INIT = [
@@ -10,11 +12,7 @@ const BANCOS_INIT = [
   { id: "bradesco", nome: "Bradesco",       agencia: "1234", conta: "98765-4", tipo: "Corrente" },
 ];
 
-const HISTORICO = [
-  { data: "24/02/2026", valor: 2_000.00, status: "processado", banco: "Itaú Unibanco" },
-  { data: "18/02/2026", valor: 5_500.00, status: "processado", banco: "Itaú Unibanco" },
-  { data: "10/02/2026", valor: 1_200.00, status: "processado", banco: "Bradesco"       },
-];
+/* Histórico virá de GET /transactions?type=WITHDRAW */
 
 const BANCOS_LISTA = [
   "Itaú Unibanco", "Bradesco", "Banco do Brasil", "Caixa Econômica Federal",
@@ -260,19 +258,32 @@ function ModalConta({ onClose, onSalvar }) {
 
 /* ─── Página principal ──────────────────────────────────────── */
 export function SolicitarSaque() {
-  const [valor,        setValor]        = useState("");
-  const [banco,        setBanco]        = useState("itau");
-  const [bancos,       setBancos]       = useState(BANCOS_INIT);
-  const [modalConta,   setModalConta]   = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(null); // id da conta aguardando confirmação
+  const [valor, setValor] = useState("");
+  const [pin, setPin] = useState("");
+  const [banco, setBanco] = useState(BANCOS_INIT[0]?.id ?? "");
+  const [bancos, setBancos] = useState(BANCOS_INIT);
+  const [modalConta, setModalConta] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [saldoDisponivel, setSaldoDisponivel] = useState(0);
+  const [historico, setHistorico] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saqueError, setSaqueError] = useState("");
 
-  const saldoDisponivel = 48_240.00;
-  const valorNum  = parseValor(valor);
+  useEffect(() => {
+    apiJson("/balance").then((r) => setSaldoDisponivel(parseFloat(r?.balance ?? r?.data?.balance ?? 0) || 0)).catch(() => {});
+    apiJson("/transactions?type=WITHDRAW").then((r) => {
+      const data = Array.isArray(r?.data) ? r.data : [];
+      setHistorico(data.map((t) => ({ data: formatDateShort(t.created_at), valor: parseFloat(t.amount), status: "processado", banco: t.nome || "—" })));
+    }).catch(() => setHistorico([]));
+  }, []);
+
+  const valorNum = parseValor(valor);
   const taxaValor = TAXA_PCT > 0 ? valorNum * TAXA_PCT : TAXA_SAQUE;
-  const valorLiq  = Math.max(0, valorNum - taxaValor);
+  const valorLiq = Math.max(0, valorNum - taxaValor);
   const saldoApos = saldoDisponivel - valorNum;
-  const excede    = valorNum > saldoDisponivel;
-  const invalido  = valorNum <= 0 || excede;
+  const excede = valorNum > saldoDisponivel;
+  const contaSelecionada = bancos.find((b) => b.id === banco);
+  const invalido = valorNum <= 0 || excede || !pin || !contaSelecionada || !contaSelecionada.pixKey;
 
   const handleValor = (e) => {
     const f = formatValor(e.target.value);
@@ -288,6 +299,35 @@ export function SolicitarSaque() {
     if (bancos.length >= 3) return;
     setBancos((prev) => [...prev, novaConta]);
     setBanco(novaConta.id);
+  };
+
+  const solicitarSaque = async () => {
+    if (invalido || !contaSelecionada) return;
+    setSaqueError("");
+    setLoading(true);
+    try {
+      await apiJson("/pix/cashout", {
+        method: "POST",
+        body: JSON.stringify({
+          nome: contaSelecionada.titular || contaSelecionada.nome,
+          cpf: (contaSelecionada.cpfCnpj || "").replace(/\D/g, ""),
+          key: contaSelecionada.pixKey || "",
+          valor: valorNum,
+          pin,
+        }),
+      });
+      setValor("");
+      setPin("");
+      const bal = await apiJson("/balance");
+      setSaldoDisponivel(parseFloat(bal?.balance ?? bal?.data?.balance ?? 0) || 0);
+      const list = await apiJson("/transactions?type=WITHDRAW");
+      const data = Array.isArray(list?.data) ? list.data : [];
+      setHistorico(data.map((t) => ({ data: formatDateShort(t.created_at), valor: parseFloat(t.amount), status: "processado", banco: t.nome || "—" })));
+    } catch (err) {
+      setSaqueError(err?.data?.message || err?.message || "Falha ao solicitar saque.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const excluirConta = (id) => {
@@ -479,11 +519,17 @@ export function SolicitarSaque() {
               </div>
             </div>
 
+            <div>
+              <label className="form-label">PIN de segurança</label>
+              <input className="form-input" type="password" inputMode="numeric" placeholder="••••" maxLength={10} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} style={{ maxWidth: 120 }} />
+            </div>
+            {saqueError && <p className="field-error">{saqueError}</p>}
             <div style={{ marginTop: "auto" }}>
-              <button className="btn btn-primary"
+              <button type="button" className="btn btn-primary"
                 style={{ width: "100%", justifyContent: "center", gap: 6 }}
-                disabled={invalido || !banco}>
-                <ArrowUpRight size={15} /> Solicitar saque
+                disabled={invalido || !banco}
+                onClick={solicitarSaque}>
+                {loading ? <><Loader2 size={15} className="spin" /> Processando...</> : <><ArrowUpRight size={15} /> Solicitar saque</>}
               </button>
             </div>
           </div>
@@ -495,9 +541,9 @@ export function SolicitarSaque() {
             <p className="card-title">Histórico de saques</p>
           </div>
           <div style={{ flex: 1 }}>
-            {HISTORICO.length === 0 ? (
+            {historico.length === 0 ? (
               <p style={{ padding: "20px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>Sem saques anteriores.</p>
-            ) : HISTORICO.map((h, i) => (
+            ) : historico.map((h, i) => (
               <div key={i} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
                 padding: "11px 16px",

@@ -6,6 +6,8 @@ import {
   Clock, AlertTriangle, ArrowLeft,
 } from "lucide-react";
 import logoImg from "../../assets/logo.webp";
+import { apiJson } from "../../api/client";
+import { useAuth } from "../../contexts/AuthContext";
 
 /* ─── Rate limiting — verificação de e-mail ───────────────── */
 const VF_KEY      = (e) => `cad_verify_${e.toLowerCase().trim()}`;
@@ -122,7 +124,10 @@ export function Cadastro() {
   const [vfCooldown, setVfCooldown]= useState(0);
   const [vfError,    setVfError]   = useState("");
   const [vfSent,     setVfSent]    = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerError,   setRegisterError]  = useState("");
   const codeRefs = useRef([]);
+  const { login } = useAuth();
 
   const [form, setForm] = useState({
     nome:"", email:"", telefone:"",
@@ -226,13 +231,45 @@ export function Cadastro() {
     setTimeout(() => setVfSent(false), 4000);
   };
 
-  /* Ao entrar no step 4, registra o primeiro envio */
-  const irParaStep4 = (e) => {
+  /* Ao criar conta (step 2 submit): POST register, depois tela de verificação de e-mail */
+  const irParaStep4 = async (e) => {
     e.preventDefault();
     if (form.senha !== form.confirmar) return;
-    saveVfAttempt(form.email);
-    setVfCooldown(VF_COOLDOWN);
-    setStep(3);
+    setRegisterError("");
+    setRegisterLoading(true);
+    try {
+      const payload = {
+        name: form.nome.trim(),
+        email: form.email.trim(),
+        password: form.senha,
+        password_confirmation: form.confirmar,
+        telefone: form.telefone || undefined,
+        tipo: form.tipoEmpresa === "fisica" ? "PF" : "PJ",
+        documento: form.documento,
+        nomeEmpresa: form.nomeEmpresa || undefined,
+        cep: form.cep || undefined,
+        logradouro: form.logradouro || undefined,
+        numero: form.numero || undefined,
+        complemento: form.complemento || undefined,
+        bairro: form.bairro || undefined,
+        cidade: form.cidade || undefined,
+        estado: form.estado || undefined,
+      };
+      const res = await apiJson("/auth/register", { method: "POST", body: JSON.stringify(payload) });
+      if (res?.token && res?.user) login(res.token, res.user);
+      saveVfAttempt(form.email);
+      setVfCooldown(VF_COOLDOWN);
+      setStep(3);
+    } catch (err) {
+      const msg = err?.data?.message
+        ?? err?.data?.errors?.email?.[0]
+        ?? err?.data?.errors?.documento?.[0]
+        ?? err?.message
+        ?? "Erro ao criar conta. Tente novamente.";
+      setRegisterError(msg);
+    } finally {
+      setRegisterLoading(false);
+    }
   };
 
   /* ── Derivados ───────────────────────────────────────────── */
@@ -308,7 +345,7 @@ export function Cadastro() {
                 <label className="form-label">Nome completo</label>
                 <div className="form-icon-wrap">
                   <User size={14} className="form-icon" />
-                  <input className="form-input" placeholder="Rafael Araujo"
+                  <input className="form-input" placeholder="Ex.: João Silva"
                     value={form.nome} onChange={onNomeChange} required />
                 </div>
               </div>
@@ -579,11 +616,12 @@ export function Cadastro() {
                 </span>
               </div>
 
+              {registerError && <p className="field-error">{registerError}</p>}
               <div className="auth-btn-row">
-                <button type="button" className="btn btn-ghost auth-btn-back" onClick={back}>Voltar</button>
+                <button type="button" className="btn btn-ghost auth-btn-back" onClick={back} disabled={registerLoading}>Voltar</button>
                 <button type="submit" className="btn btn-primary auth-btn-next"
-                  disabled={!canNext2} style={{ opacity: canNext2 ? 1 : 0.5 }}>
-                  Criar conta <ArrowRight size={15} />
+                  disabled={!canNext2 || registerLoading} style={{ opacity: canNext2 && !registerLoading ? 1 : 0.5 }}>
+                  {registerLoading ? <><Loader2 size={15} className="spin" /> Criando conta...</> : <>Criar conta <ArrowRight size={15} /></>}
                 </button>
               </div>
             </form>

@@ -50,8 +50,11 @@ class SendPushcutNotificationJob implements ShouldQueue
             return;
         }
 
-        $amount     = number_format((float) $transaction->amount, 2, ',', '.');
-        $netAmount  = number_format($transaction->netAmount(), 2, ',', '.');
+        // Converte centavos para reais via bcmath para exibição — nunca float
+        $amountReais   = bcdiv((string) (int) $transaction->amount, '100', 2);
+        $netAmountReais = bcdiv((string) $transaction->netAmount(), '100', 2);
+        $amount    = number_format((float) $amountReais, 2, ',', '.');
+        $netAmount = number_format((float) $netAmountReais, 2, ',', '.');
         $type       = $transaction->type->label();
         $status     = $transaction->status->label();
 

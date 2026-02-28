@@ -13,22 +13,26 @@ services:
 
   octane:
     build:
-      target: base   # imagem base sem otimizacoes de producao
+      target: base
     command: php artisan octane:start --server=swoole --host=0.0.0.0 --port=8000 --watch
     volumes:
       - .:/var/www/html
+      - ./docker/php/php-dev.ini:/usr/local/etc/php/conf.d/100-dev.ini
 
   horizon:
     build:
       target: base
     volumes:
       - .:/var/www/html
+      - ./docker/php/php-dev.ini:/usr/local/etc/php/conf.d/100-dev.ini
 
   scheduler:
     build:
       target: base
     volumes:
       - .:/var/www/html
+      - ./docker/php/php-dev.ini:/usr/local/etc/php/conf.d/100-dev.ini
+
 
   # Telescope apenas em dev
   telescope:

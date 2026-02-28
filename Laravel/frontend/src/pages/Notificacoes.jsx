@@ -1,19 +1,11 @@
-import { useState } from "react";
-import { Bell, Info, AlertTriangle, XCircle, CheckCheck, Inbox } from "lucide-react";
-
-const NOTIFS_INIT = [
-  { id: 1, tipo: "info",    titulo: "Nova transação aprovada",       desc: "TXN-8821 de R$ 1.250,00 foi aprovada com sucesso.",        tempo: "há 2 min",  lida: false },
-  { id: 2, tipo: "warning", titulo: "Strike com latência elevada",   desc: "O adquirente Strike está com latência de 180ms.",           tempo: "há 15 min", lida: false },
-  { id: 3, tipo: "danger",  titulo: "BSPay indisponível",            desc: "O adquirente BSPay está fora do ar há 8 minutos.",          tempo: "há 22 min", lida: false },
-  { id: 4, tipo: "info",    titulo: "Saque processado",              desc: "Seu saque de R$ 2.000,00 foi processado com sucesso.",      tempo: "há 1h",     lida: true  },
-  { id: 5, tipo: "info",    titulo: "Relatório mensal disponível",   desc: "O relatório de Janeiro/2026 está pronto para download.",    tempo: "há 2h",     lida: true  },
-  { id: 6, tipo: "warning", titulo: "Tentativa de login suspeita",   desc: "Detectamos um acesso de IP desconhecido (201.18.92.44).",   tempo: "há 3h",     lida: true  },
-  { id: 7, tipo: "info",    titulo: "Transação aprovada",            desc: "TXN-8799 de R$ 430,00 aprovada via Cartão.",                tempo: "há 5h",     lida: true  },
-  { id: 8, tipo: "danger",  titulo: "Contestação recebida",          desc: "DSP-441 de R$ 445,00 aguarda sua resposta.",                tempo: "há 6h",     lida: true  },
-];
+import { useState, useEffect } from "react";
+import { Bell, Info, AlertTriangle, XCircle, CheckCheck, Inbox, Loader2, CheckCircle2 } from "lucide-react";
+import { apiJson } from "../api/client";
+import { useNotifications } from "../contexts/NotificationContext";
 
 const META = {
   info:    { icon: Info,          cor: "var(--accent)",  bg: "var(--accent-faint)" },
+  success: { icon: CheckCircle2,  cor: "var(--green)",   bg: "var(--green-faint)"  },
   warning: { icon: AlertTriangle, cor: "var(--yellow)",  bg: "var(--yellow-faint)" },
   danger:  { icon: XCircle,       cor: "var(--red)",     bg: "var(--red-faint)"    },
 };
@@ -26,27 +18,87 @@ const FILTROS = [
   { id: "naoLida", label: "Não lidas"},
 ];
 
-const LIMITE = 8;
+const LIMITE = 20;
+
+function timeAgo(iso) {
+  if (!iso) return "";
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60)  return "agora";
+  if (diff < 3600) return `há ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `há ${Math.floor(diff / 3600)}h`;
+  return `há ${Math.floor(diff / 86400)} dia${Math.floor(diff / 86400) > 1 ? "s" : ""}`;
+}
+
+function mapNotif(n) {
+  return {
+    id:     n.id,
+    tipo:   META[n.type] ? n.type : "info",
+    titulo: n.title,
+    desc:   n.message,
+    tempo:  timeAgo(n.created_at),
+    lida:   n.is_read,
+  };
+}
 
 export function Notificacoes() {
-  const [notifs,    setNotifs]    = useState(NOTIFS_INIT);
-  const [filtro,    setFiltro]    = useState("todas");
-  const [mostrar,   setMostrar]   = useState(LIMITE);
+  const { refreshCount } = useNotifications();
+  const [notifs,  setNotifs]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filtro,  setFiltro]  = useState("todas");
+  const [pagina,  setPagina]  = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [marking, setMarking] = useState(false);
 
-  const naoLidas    = notifs.filter((n) => !n.lida).length;
-  const marcarTodas = () => setNotifs((p) => p.map((n) => ({ ...n, lida: true })));
-  const marcarUma   = (id) => setNotifs((p) => p.map((n) => n.id === id ? { ...n, lida: true } : n));
+  const load = (page = 1) => {
+    setLoading(true);
+    apiJson(`/notifications?page=${page}`)
+      .then((r) => {
+        const list = Array.isArray(r?.data) ? r.data.map(mapNotif) : [];
+        setNotifs((prev) => page === 1 ? list : [...prev, ...list]);
+        setLastPage(r?.meta?.last_page ?? 1);
+        setPagina(page);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(1); }, []);
+
+  const naoLidas = notifs.filter((n) => !n.lida).length;
+
+  const marcarUma = async (id) => {
+    const notif = notifs.find((n) => n.id === id);
+    if (!notif || notif.lida) return;
+    setNotifs((p) => p.map((n) => n.id === id ? { ...n, lida: true } : n));
+    try {
+      await apiJson(`/notifications/${id}/read`, { method: "PUT" });
+      refreshCount();
+    } catch {
+      setNotifs((p) => p.map((n) => n.id === id ? { ...n, lida: false } : n));
+    }
+  };
+
+  const marcarTodas = async () => {
+    if (marking) return;
+    setMarking(true);
+    setNotifs((p) => p.map((n) => ({ ...n, lida: true })));
+    try {
+      await apiJson("/notifications/read-all", { method: "POST" });
+      refreshCount();
+    } catch {
+      load(1);
+    } finally {
+      setMarking(false);
+    }
+  };
 
   const filtrada = notifs.filter((n) => {
     if (filtro === "naoLida") return !n.lida;
-    if (filtro === "todas") return true;
+    if (filtro === "todas")   return true;
     return n.tipo === filtro;
   });
 
-  const lista      = filtrada.slice(0, mostrar);
-  const temMais    = filtrada.length > mostrar;
-
-  const onFiltro = (f) => { setFiltro(f); setMostrar(LIMITE); };
+  const onFiltro = (f) => { setFiltro(f); };
 
   return (
     <div>
@@ -54,12 +106,17 @@ export function Notificacoes() {
         <div>
           <h1 className="page-title">Notificações</h1>
           <p className="page-subtitle">
-            {naoLidas > 0 ? `${naoLidas} não lida${naoLidas > 1 ? "s" : ""}` : "Tudo em dia"}
+            {loading && notifs.length === 0
+              ? "Carregando..."
+              : naoLidas > 0
+                ? `${naoLidas} não lida${naoLidas > 1 ? "s" : ""}`
+                : "Tudo em dia"}
           </p>
         </div>
         {naoLidas > 0 && (
-          <button className="btn btn-ghost btn-sm" onClick={marcarTodas}>
-            <CheckCheck size={14} /> Marcar todas como lidas
+          <button className="btn btn-ghost btn-sm" onClick={marcarTodas} disabled={marking}>
+            {marking ? <Loader2 size={14} className="spin" /> : <CheckCheck size={14} />}
+            Marcar todas como lidas
           </button>
         )}
       </div>
@@ -87,22 +144,28 @@ export function Notificacoes() {
           </div>
         </div>
 
-        {lista.length === 0 ? (
+        {loading && notifs.length === 0 ? (
+          <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-3)" }}>
+            <Loader2 size={24} className="spin" style={{ margin: "0 auto 10px" }} />
+            <p style={{ fontSize: 13 }}>Carregando notificações...</p>
+          </div>
+        ) : filtrada.length === 0 ? (
           <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-3)" }}>
             <Inbox size={28} style={{ margin: "0 auto 10px", opacity: 0.2 }} />
             <p style={{ fontSize: 13 }}>Nenhuma notificação nesta categoria.</p>
           </div>
-        ) : lista.map((n, i) => {
-          const { icon: Icon, cor, bg } = META[n.tipo];
+        ) : filtrada.map((n, i) => {
+          const meta = META[n.tipo] ?? META.info;
+          const Icon = meta.icon;
           return (
             <div
               key={n.id}
               className={`notif-row${n.lida ? "" : " notif-unread"}`}
-              style={{ borderBottom: i < lista.length - 1 ? "1px solid var(--border-2)" : "none" }}
+              style={{ borderBottom: i < filtrada.length - 1 ? "1px solid var(--border-2)" : "none", cursor: n.lida ? "default" : "pointer" }}
               onClick={() => marcarUma(n.id)}
             >
-              <div className="notif-icon" style={{ background: bg }}>
-                <Icon size={15} color={cor} />
+              <div className="notif-icon" style={{ background: meta.bg }}>
+                <Icon size={15} color={meta.cor} />
               </div>
               <div className="notif-body">
                 <div className="notif-top">
@@ -116,11 +179,10 @@ export function Notificacoes() {
           );
         })}
 
-        {/* Ver mais */}
-        {temMais && (
+        {pagina < lastPage && (
           <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border-2)", textAlign: "center" }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => setMostrar((v) => v + LIMITE)}>
-              Ver mais ({filtrada.length - mostrar} restantes)
+            <button className="btn btn-ghost btn-sm" disabled={loading} onClick={() => load(pagina + 1)}>
+              {loading ? <Loader2 size={13} className="spin" /> : "Carregar mais"}
             </button>
           </div>
         )}

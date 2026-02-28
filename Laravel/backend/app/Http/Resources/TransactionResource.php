@@ -13,15 +13,16 @@ class TransactionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // Valores internos em centavos (int) — convertidos para reais (string) na serialização
         return [
             'id'           => $this->id,
             'status'       => $this->status->value,
             'status_label' => $this->status->label(),
             'type'         => $this->type->value,
             'type_label'   => $this->type->label(),
-            'amount'       => number_format((float) $this->amount, 2, '.', ''),
-            'tax'          => number_format((float) $this->tax, 2, '.', ''),
-            'net_amount'   => number_format($this->netAmount(), 2, '.', ''),
+            'amount'       => bcdiv((string) (int) $this->amount, '100', 2),
+            'tax'          => bcdiv((string) (int) $this->tax, '100', 2),
+            'net_amount'   => bcdiv((string) $this->netAmount(), '100', 2),
             'nome'         => $this->nome,
             'descricao'    => $this->descricao,
             'created_at'   => $this->created_at?->toIso8601String(),

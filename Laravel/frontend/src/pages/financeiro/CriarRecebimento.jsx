@@ -6,19 +6,10 @@ import {
 } from "lucide-react";
 import { Paginacao } from "../../components/Paginacao";
 import { gerarPaginas } from "../../utils/paginacao";
+import { apiJson } from "../../api/client";
+import { formatDateTimeBR } from "../../utils/date";
 
-/* ─── Mock de cobranças geradas ─────────────────────────────── */
-const MOCK = [
-  { id: "COB-0081", tipo: "pix",    valor: 250.00,  desc: "Pedido #4521",   status: "pago",     criado: "26/02/2026 14:22" },
-  { id: "COB-0080", tipo: "boleto", valor: 1200.00, desc: "Mensalidade Fev", status: "pendente", criado: "25/02/2026 10:05", venc: "28/02/2026" },
-  { id: "COB-0079", tipo: "link",   valor: 89.90,   desc: "Produto digital", status: "pago",     criado: "24/02/2026 08:47" },
-  { id: "COB-0078", tipo: "pix",    valor: 430.00,  desc: "",               status: "expirado",  criado: "22/02/2026 16:30" },
-  { id: "COB-0077", tipo: "boleto", valor: 760.00,  desc: "Serviço mensal",  status: "cancelado", criado: "20/02/2026 09:12", venc: "22/02/2026" },
-  { id: "COB-0076", tipo: "pix",    valor: 55.00,   desc: "Entrega rápida",  status: "pago",     criado: "19/02/2026 11:00" },
-  { id: "COB-0075", tipo: "link",   valor: 320.00,  desc: "Consultoria",    status: "pendente",  criado: "18/02/2026 13:50" },
-  { id: "COB-0074", tipo: "pix",    valor: 99.90,   desc: "Assinatura",     status: "pago",      criado: "17/02/2026 17:20" },
-  { id: "COB-0073", tipo: "boleto", valor: 500.00,  desc: "",               status: "expirado",  criado: "15/02/2026 08:00", venc: "17/02/2026" },
-];
+const STATUS_MAP = { PAID: "pago", PENDING: "pendente", CANCELLED: "cancelado", REVERSED: "expirado" };
 
 const POR_PAGINA = 7;
 
@@ -132,23 +123,52 @@ const MOCK_LINK   = "https://pay.gatewayjj.com/c/x7k2m9";
 const MOCK_CODIGO = "34191.09008 61207.727285 61380.550003 3 94650000025000";
 
 function ModalNovaCobranca({ onClose, onCriada }) {
-  const [etapa,      setEtapa]      = useState("tipo");   // "tipo" | "form" | "resultado"
-  const [tipo,       setTipo]       = useState(null);
-  const [valor,      setValor]      = useState("");
-  const [descricao,  setDescricao]  = useState("");
+  const [etapa, setEtapa] = useState("tipo");
+  const [tipo, setTipo] = useState(null);
+  const [valor, setValor] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [nome, setNome] = useState("");
+  const [cpf, setCpf] = useState("");
   const [vencimento, setVencimento] = useState("");
-  const [copiado,    setCopiado]    = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [resultadoPix, setResultadoPix] = useState(null);
 
   const valorNum = parseFloat(valor.replace(/\./g, "").replace(",", ".")) || 0;
-  const podeGerar = valorNum > 0 && (tipo !== "boleto" || vencimento);
+  const podeGerarPix = valorNum > 0 && nome.trim() && cpf.replace(/\D/g, "").length >= 11;
+  const podeGerar = valorNum > 0 && (tipo !== "pix" ? (tipo !== "boleto" || vencimento) : podeGerarPix);
 
-  const selecionar = (t) => { setTipo(t); setEtapa("form"); };
+  const selecionar = (t) => { setTipo(t); setEtapa("form"); setError(""); };
 
-  const gerar = (e) => {
+  const gerar = async (e) => {
     e.preventDefault();
     if (!podeGerar) return;
-    setEtapa("resultado");
-    onCriada?.({ tipo, valor: valorNum, desc: descricao });
+    if (tipo === "pix") {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await apiJson("/pix/cashin", {
+          method: "POST",
+          body: JSON.stringify({
+            nome: nome.trim(),
+            cpf: cpf.replace(/\D/g, ""),
+            valor: valorNum,
+            descricao: descricao || undefined,
+          }),
+        });
+        setResultadoPix(res);
+        setEtapa("resultado");
+        onCriada?.(res);
+      } catch (err) {
+        setError(err?.data?.message || err?.message || "Falha ao gerar cobrança.");
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setEtapa("resultado");
+      onCriada?.({ tipo, valor: valorNum, desc: descricao });
+    }
   };
 
   const copiar = () => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); };
@@ -224,6 +244,18 @@ function ModalNovaCobranca({ onClose, onCriada }) {
         {etapa === "form" && (
           <form onSubmit={gerar}>
             <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {tipo === "pix" && (
+                <>
+                  <div>
+                    <label className="form-label">Nome do pagador</label>
+                    <input className="form-input" placeholder="Nome completo" value={nome} onChange={(e) => setNome(e.target.value)} required />
+                  </div>
+                  <div>
+                    <label className="form-label">CPF do pagador</label>
+                    <input className="form-input" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4"))} required />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="form-label">Valor</label>
                 <div style={{ position: "relative" }}>
@@ -234,7 +266,7 @@ function ModalNovaCobranca({ onClose, onCriada }) {
                     value={valor}
                     onChange={(e) => setValor(formatValorInput(e.target.value))}
                     style={{ paddingLeft: 36, fontSize: 15, fontWeight: 600 }}
-                    autoFocus
+                    autoFocus={tipo !== "pix"}
                   />
                 </div>
               </div>
@@ -261,10 +293,11 @@ function ModalNovaCobranca({ onClose, onCriada }) {
                 </div>
               )}
             </div>
+            {error && <p className="field-error" style={{ marginTop: 0 }}>{error}</p>}
             <div className="modal-footer">
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEtapa("tipo")}>Voltar</button>
-              <button type="submit" className="btn btn-primary btn-sm" disabled={!podeGerar} style={{ gap: 6 }}>
-                <QrCode size={13} /> Gerar cobrança
+              <button type="submit" className="btn btn-primary btn-sm" disabled={!podeGerar || loading} style={{ gap: 6 }}>
+                {loading ? <><Loader2 size={13} className="spin" /> Gerando...</> : <><QrCode size={13} /> Gerar cobrança</>}
               </button>
             </div>
           </form>
@@ -288,8 +321,12 @@ function ModalNovaCobranca({ onClose, onCriada }) {
               {/* QR Code (pix / link) */}
               {(tipo === "pix" || tipo === "link") && (
                 <div style={{ display: "flex", justifyContent: "center", padding: "16px 0 8px" }}>
-                  <div style={{ width: 140, height: 140, background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <QrCode size={64} style={{ opacity: 0.2 }} />
+                  <div style={{ width: 140, height: 140, background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: "var(--radius-sm)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                    {tipo === "pix" && resultadoPix?.qr_code ? (
+                      <img src={resultadoPix.qr_code} alt="QR Code Pix" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                    ) : (
+                      <QrCode size={64} style={{ opacity: 0.2 }} />
+                    )}
                   </div>
                 </div>
               )}
@@ -306,10 +343,14 @@ function ModalNovaCobranca({ onClose, onCriada }) {
               )}
 
               {/* Código Pix */}
-              {tipo === "pix" && (
-                <button className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "center", gap: 6 }} onClick={copiar}>
-                  {copiado ? <><Check size={12} style={{ color: "var(--green)" }} /> Copiado!</> : <><Copy size={12} /> Copiar código Pix</>}
-                </button>
+              {tipo === "pix" && (resultadoPix?.qr_code_text || MOCK_CODIGO) && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <p style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".04em" }}>Código Pix copia e cola</p>
+                  <p style={{ fontFamily: "monospace", fontSize: 10.5, color: "var(--text-2)", background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: "var(--radius-sm)", padding: "8px 10px", wordBreak: "break-all", lineHeight: 1.6 }}>{(resultadoPix && resultadoPix.qr_code_text) || MOCK_CODIGO}</p>
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "center", gap: 6 }} onClick={() => { navigator.clipboard.writeText((resultadoPix && resultadoPix.qr_code_text) || MOCK_CODIGO); setCopiado(true); setTimeout(() => setCopiado(false), 2000); }}>
+                    {copiado ? <><Check size={12} style={{ color: "var(--green)" }} /> Copiado!</> : <><Copy size={12} /> Copiar código Pix</>}
+                  </button>
+                </div>
               )}
 
               {/* Boleto */}
@@ -330,7 +371,7 @@ function ModalNovaCobranca({ onClose, onCriada }) {
             </div>
             <div className="modal-footer">
               <button className="btn btn-ghost btn-sm" onClick={onClose}>Fechar</button>
-              <button className="btn btn-primary btn-sm" style={{ gap: 6 }} onClick={() => { setEtapa("tipo"); setTipo(null); setValor(""); setDescricao(""); setVencimento(""); }}>
+              <button className="btn btn-primary btn-sm" style={{ gap: 6 }} onClick={() => { setEtapa("tipo"); setTipo(null); setValor(""); setDescricao(""); setVencimento(""); setNome(""); setCpf(""); setResultadoPix(null); }}>
                 <Plus size={13} /> Nova cobrança
               </button>
             </div>
@@ -342,32 +383,49 @@ function ModalNovaCobranca({ onClose, onCriada }) {
 }
 
 /* ─── Página principal ───────────────────────────────────────── */
+function mapTxToCob(tx) {
+  return {
+    id: String(tx.id),
+    tipo: "pix",
+    valor: parseFloat(tx.amount) || 0,
+    desc: tx.descricao || tx.nome || "",
+    status: STATUS_MAP[tx.status] || "pendente",
+    criado: formatDateTimeBR(tx.created_at),
+  };
+}
+
 export function CriarRecebimento() {
-  const [cobracas,    setCobracas]    = useState(MOCK);
+  const [cobracas, setCobracas] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
-  const [pagina,      setPagina]      = useState(1);
+  const [pagina, setPagina] = useState(1);
 
-  const total   = cobracas.length;
-  const inicio  = (pagina - 1) * POR_PAGINA;
+  const loadTransactions = () => {
+    setLoading(true);
+    apiJson("/transactions?type=DEPOSIT")
+      .then((r) => {
+        const data = Array.isArray(r?.data) ? r.data : [];
+        setCobracas(data.map(mapTxToCob));
+      })
+      .catch(() => setCobracas([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => loadTransactions(), []);
+
+  const total = cobracas.length;
+  const inicio = (pagina - 1) * POR_PAGINA;
   const paginas = gerarPaginas(pagina, Math.ceil(total / POR_PAGINA));
-  const lista   = cobracas.slice(inicio, inicio + POR_PAGINA);
+  const lista = cobracas.slice(inicio, inicio + POR_PAGINA);
 
-  const handleCriada = ({ tipo, valor, desc }) => {
-    const nova = {
-      id:     `COB-${String(cobracas.length + 82).padStart(4, "0")}`,
-      tipo,
-      valor,
-      desc:   desc || "",
-      status: "pendente",
-      criado: new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
-    };
-    setCobracas((prev) => [nova, ...prev]);
+  const handleCriada = (res) => {
+    if (res && res.id) setCobracas((prev) => [mapTxToCob(res), ...prev]);
+    else if (res?.tipo) setCobracas((prev) => [{ id: `mock-${Date.now()}`, tipo: res.tipo, valor: res.valor, desc: res.desc || "", status: "pendente", criado: formatDateTimeBR(new Date().toISOString()) }, ...prev]);
     setPagina(1);
   };
 
-  /* resumo KPI */
-  const totalValor    = cobracas.reduce((a, c) => a + c.valor, 0);
-  const totalPago     = cobracas.filter((c) => c.status === "pago").reduce((a, c) => a + c.valor, 0);
+  const totalValor = cobracas.reduce((a, c) => a + c.valor, 0);
+  const totalPago = cobracas.filter((c) => c.status === "pago").reduce((a, c) => a + c.valor, 0);
   const totalPendente = cobracas.filter((c) => c.status === "pendente").reduce((a, c) => a + c.valor, 0);
 
   return (
@@ -419,7 +477,11 @@ export function CriarRecebimento() {
               </tr>
             </thead>
             <tbody>
-              {lista.map((c, i) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: "32px 16px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>Carregando...</td>
+                </tr>
+              ) : lista.map((c, i) => (
                 <tr key={c.id} style={{ borderBottom: i < lista.length - 1 ? "1px solid var(--border-2)" : "none", transition: "background var(--dur)" }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-2)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}

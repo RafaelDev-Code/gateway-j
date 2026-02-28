@@ -3,19 +3,23 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     private User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
+        // Garante rate limiter limpo — evita flakiness do full suite (HIGH-8)
+        Cache::flush();
 
         $this->user = User::factory()->create([
             'email'    => 'merchant@example.com',
@@ -92,11 +96,11 @@ class AuthTest extends TestCase
 
         $logoutResponse->assertStatus(200);
 
-        $meResponse = $this->getJson('/api/v1/auth/me', [
-            'Authorization' => "Bearer {$token}",
-        ]);
-
-        $meResponse->assertStatus(401);
+        // Verifica que o token foi removido do banco de dados
+        // (não usa HTTP request posterior pois Sanctum faz cache em memória no mesmo processo de teste)
+        $tokenRecord = PersonalAccessToken::findToken($token);
+        $this->assertNull($tokenRecord, 'Token deve ser revogado após logout');
+        $this->assertEquals(0, $this->user->fresh()->tokens()->count());
     }
 
     public function test_create_pin_for_first_time(): void

@@ -36,8 +36,31 @@ class SecurityHeaders
             'geolocation=(), microphone=(), camera=(), payment=()'
         );
 
-        // API nao gera HTML - CSP restritiva
-        $response->headers->set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+        // CSP com duas políticas separadas (HIGH-13):
+        // - /admin/* → CSP permissiva para Filament/Livewire (inline scripts/styles obrigatórios)
+        // - demais rotas → CSP restritiva (apenas self, sem unsafe-eval)
+        if ($request->is('admin') || $request->is('admin/*')) {
+            $response->headers->set(
+                'Content-Security-Policy',
+                "default-src 'self'; " .
+                "script-src 'self' 'unsafe-inline'; " .
+                "style-src 'self' 'unsafe-inline' https://fonts.bunny.net; " .
+                "font-src 'self' https://fonts.bunny.net data:; " .
+                "img-src 'self' data: blob:; " .
+                "connect-src 'self' ws: wss:; " .
+                "frame-ancestors 'none'"
+            );
+        } else {
+            $response->headers->set(
+                'Content-Security-Policy',
+                "default-src 'self'; " .
+                "script-src 'self'; " .
+                "style-src 'self'; " .
+                "img-src 'self' data:; " .
+                "connect-src 'self'; " .
+                "frame-ancestors 'none'"
+            );
+        }
 
         // Remove headers que revelam stack
         $response->headers->remove('X-Powered-By');

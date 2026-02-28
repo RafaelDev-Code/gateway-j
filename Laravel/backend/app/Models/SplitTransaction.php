@@ -20,7 +20,7 @@ class SplitTransaction extends Model
     {
         return [
             'processed'    => 'boolean',
-            'amount'       => 'decimal:6',
+            'amount'       => 'integer',
             'processed_at' => 'datetime',
         ];
     }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Bell, Sun, Moon, Menu, ChevronDown, User, Shield, LogOut } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 const TZ_BRASILIA = "America/Sao_Paulo";
 
@@ -29,14 +30,17 @@ const TITLES = {
   "/configuracoes/seguranca": { title: "Segurança",          bread: "Configurações / Segurança" },
 };
 
-/* Número de não-lidas simulado (em produção viria de contexto/API) */
-const NOTIFS_NAO_LIDAS = 3;
+const ROLE_LABEL = { USER: "Merchant", MANAGER: "Gerente", ADMIN: "Administrador" };
 
-export function TopBar({ onMenuClick }) {
+export function TopBar({ onMenuClick, unreadCount = 0 }) {
   const { theme, toggleTheme } = useTheme();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const { title, bread } = TITLES[pathname] || { title: "Painel", bread: "" };
+  const userName = user?.name || "Usuário";
+  const roleLabel = ROLE_LABEL[user?.role] || user?.role || "—";
+  const iniciais = (userName || "?").split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "?";
 
   const [dataBrasilia,   setDataBrasilia]   = useState(() => formatDataBrasilia());
   const [dropdownAberto, setDropdownAberto] = useState(false);
@@ -77,7 +81,7 @@ export function TopBar({ onMenuClick }) {
       <div className="tb-greeting">
         <p className="tb-greeting-line">
           <span className="tb-greeting-ola">Olá,</span>{" "}
-          <span className="tb-greeting-name">Rafael Araujo.</span>
+          <span className="tb-greeting-name">{userName}.</span>
         </p>
         <p className="tb-greeting-date">{dataBrasilia}</p>
       </div>
@@ -104,7 +108,7 @@ export function TopBar({ onMenuClick }) {
           onClick={() => navigate("/notificacoes")}
         >
           <Bell size={15} />
-          {NOTIFS_NAO_LIDAS > 0 && <span className="tb-dot" aria-hidden />}
+          {unreadCount > 0 && <span className="tb-dot" aria-hidden />}
         </button>
 
         <div className="tb-sep" />
@@ -117,10 +121,10 @@ export function TopBar({ onMenuClick }) {
             aria-expanded={dropdownAberto}
             onClick={() => setDropdownAberto((v) => !v)}
           >
-            <div className="tb-avatar">A</div>
+            <div className="tb-avatar">{iniciais}</div>
             <div>
-              <div className="tb-user-name">Admin</div>
-              <div className="tb-user-role">Administrador</div>
+              <div className="tb-user-name">{userName}</div>
+              <div className="tb-user-role">{roleLabel}</div>
             </div>
             <ChevronDown
               size={13}
@@ -143,7 +147,7 @@ export function TopBar({ onMenuClick }) {
                 Segurança
               </button>
               <div className="tb-dropdown-sep" />
-              <button className="tb-dropdown-item tb-dropdown-danger" onClick={() => irPara("/login")}>
+              <button className="tb-dropdown-item tb-dropdown-danger" onClick={() => { setDropdownAberto(false); logout(); }}>
                 <LogOut size={14} />
                 Sair da conta
               </button>

@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
 
 class InsufficientBalanceException extends RuntimeException
 {
@@ -11,8 +12,11 @@ class InsufficientBalanceException extends RuntimeException
         parent::__construct('Saldo insuficiente para realizar esta operacao.');
     }
 
-    public function render(): array
+    public function render(): \Illuminate\Http\JsonResponse
     {
-        return ['message' => $this->getMessage()];
+        return response()->json([
+            'message' => $this->getMessage(),
+            'error'   => 'INSUFFICIENT_BALANCE',
+        ], Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 }

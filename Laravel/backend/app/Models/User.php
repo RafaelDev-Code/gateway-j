@@ -25,10 +25,9 @@ class User extends Authenticatable implements FilamentUser
         'pin',
         'name',
         'telefone',
+        'site',
         'cnpj',
         'faturamento',
-        'balance',
-        'role',
         'payment_pix',
         'cash_in_active',
         'cash_out_active',
@@ -40,6 +39,22 @@ class User extends Authenticatable implements FilamentUser
         'reference',
         'ref_used',
         'pushcut_link',
+        'last_login_at',
+    ];
+
+    /**
+     * Campos controlados exclusivamente por ações administrativas internas.
+     * Nunca devem ser alterados via fill() ou update() diretamente.
+     * Use forceFill() apenas dentro de Actions/Services confiáveis.
+     */
+    protected array $adminOnly = [
+        'balance',
+        'role',
+        'banned_at',
+        'ban_reason',
+        'manager_id',
+        'blocked_credentials',
+        'auto_cashout_limit',
     ];
 
     /**
@@ -67,9 +82,13 @@ class User extends Authenticatable implements FilamentUser
             'cash_out_active'   => 'boolean',
             'checkout_active'   => 'boolean',
             'documents_checked' => 'boolean',
-            'balance'           => 'decimal:6',
-            'email_verified_at' => 'datetime',
-            'deleted_at'        => 'datetime',
+            'balance'           => 'integer',
+            'email_verified_at'  => 'datetime',
+            'last_login_at'      => 'datetime',
+            'banned_at'          => 'datetime',
+            'deleted_at'         => 'datetime',
+            'blocked_credentials' => 'boolean',
+            'auto_cashout_limit' => 'integer',
         ];
     }
 
@@ -94,6 +113,23 @@ class User extends Authenticatable implements FilamentUser
         $this->attributes['pushcut_link'] = $value ? Crypt::encryptString($value) : null;
     }
 
+    public function getCnpjAttribute(?string $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Exception) {
+            return $value; // Fallback para registros antigos em texto plano
+        }
+    }
+
+    public function setCnpjAttribute(?string $value): void
+    {
+        $this->attributes['cnpj'] = $value ? Crypt::encryptString($value) : null;
+    }
+
     // --------------------------------------------------------
     // Helpers de negocio
     // --------------------------------------------------------
@@ -101,6 +137,43 @@ class User extends Authenticatable implements FilamentUser
     public function isAdmin(): bool
     {
         return $this->role === UserRole::ADMIN;
+    }
+
+    public function isManager(): bool
+    {
+        return $this->role === UserRole::MANAGER;
+    }
+
+    public function isBanned(): bool
+    {
+        return ! is_null($this->banned_at);
+    }
+
+    /**
+     * Retorna o faturamento total em centavos (int).
+     */
+    public function totalRevenue(): int
+    {
+        return (int) $this->transactions()
+            ->where('status', \App\Enums\TransactionStatus::PAID)
+            ->where('type', \App\Enums\TransactionType::DEPOSIT)
+            ->sum('amount');
+    }
+
+    /**
+     * Retorna o ticket médio em centavos (int).
+     */
+    public function averageTicket(): int
+    {
+        return (int) ($this->transactions()
+            ->where('status', \App\Enums\TransactionStatus::PAID)
+            ->where('type', \App\Enums\TransactionType::DEPOSIT)
+            ->avg('amount') ?? 0);
+    }
+
+    public function lastTransaction(): ?\App\Models\Transaction
+    {
+        return $this->transactions()->latest()->first();
     }
 
     public function canCashIn(): bool
@@ -150,6 +223,16 @@ class User extends Authenticatable implements FilamentUser
     public function notifications(): HasMany
     {
         return $this->hasMany(GatewayNotification::class);
+    }
+
+    public function manager(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    public function managedUsers(): HasMany
+    {
+        return $this->hasMany(User::class, 'manager_id');
     }
 
     // --------------------------------------------------------

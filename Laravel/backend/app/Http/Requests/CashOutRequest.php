@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\SafeUrl;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CashOutRequest extends FormRequest
@@ -19,8 +20,8 @@ class CashOutRequest extends FormRequest
             'key'       => ['required', 'string', 'max:255'], // Chave PIX
             'valor'     => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'descricao' => ['nullable', 'string', 'max:255'],
-            'pin'       => ['required', 'string', 'max:10'],
-            'postback'  => ['nullable', 'url', 'max:500'],
+            'pin'       => ['required', 'digits:4'],
+            'postback'  => ['nullable', 'url', 'max:500', new SafeUrl()],
         ];
     }
 

@@ -16,7 +16,7 @@ class TransferRequest extends FormRequest
         return [
             'username' => ['required', 'string', 'max:50'],
             'valor'    => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
-            'pin'      => ['required', 'string', 'max:10'],
+            'pin'      => ['required', 'digits:4'],
         ];
     }
 }

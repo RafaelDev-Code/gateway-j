@@ -8,6 +8,7 @@ use App\DTOs\WebhookPayloadDTO;
 use App\Enums\TransactionStatus;
 use App\Exceptions\AcquirerException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class PagPixAcquirer extends BaseAcquirer
 {
@@ -68,7 +69,8 @@ class PagPixAcquirer extends BaseAcquirer
         $secret = $this->config('webhook_secret');
 
         if (empty($secret)) {
-            return true; // Webhook secret nao configurado - aceita (loga warning)
+            Log::critical('PagPix webhook_secret nao configurado — requisicao rejeitada.', ['ip' => $request->ip()]);
+            return false;
         }
 
         $signature = $request->header('X-PagPix-Signature', '');
@@ -90,7 +92,7 @@ class PagPixAcquirer extends BaseAcquirer
         return new WebhookPayloadDTO(
             externalId:  $payload['id'] ?? '',
             status:      $statusMap[$payload['status'] ?? ''] ?? TransactionStatus::PENDING,
-            amount:      isset($payload['amount']) ? $payload['amount'] / 100 : 0,
+            amountCents: isset($payload['amount']) ? (int) $payload['amount'] : 0, // PagPix envia em centavos
             end2end:     $payload['end2end_id'] ?? null,
             payerName:   $payload['payer']['name'] ?? null,
             rawPayload:  [], // Nunca passa payload raw para o DTO

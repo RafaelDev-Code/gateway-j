@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Models\SplitTransaction;
+use App\Enums\TransactionStatus;
 use App\Models\Transaction;
 use App\Services\TaxCalculator;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,32 +28,49 @@ class ProcessSplitPaymentJob implements ShouldQueue
 
     public function handle(TaxCalculator $taxCalculator): void
     {
-        $transaction = Transaction::with('splits.targetUser')
-            ->find($this->transactionId);
+        DB::transaction(function () use ($taxCalculator) {
+            // Bloqueia a transação para evitar processamento duplo concorrente
+            $transaction = Transaction::with('splits.targetUser')
+                ->where('id', $this->transactionId)
+                ->lockForUpdate()
+                ->first();
 
-        if (! $transaction) {
-            return;
-        }
+            if (! $transaction) {
+                return;
+            }
 
-        $netAmount = $transaction->netAmount();
+            // Só processa splits se a transação estiver confirmada como PAID
+            if ($transaction->status !== TransactionStatus::PAID) {
+                Log::warning('ProcessSplitPaymentJob: transacao nao esta PAID, abortando splits', [
+                    'transaction_id' => $this->transactionId,
+                    'status'         => $transaction->status->value,
+                ]);
+                return;
+            }
 
-        DB::transaction(function () use ($transaction, $netAmount, $taxCalculator) {
+            $netAmount = $transaction->netAmount();
+
             foreach ($transaction->splits as $split) {
+                // Idempotência dentro da transação: pula splits já processados
                 if ($split->processed) {
                     continue;
                 }
 
                 if (! $split->targetUser) {
-                    Log::warning('Split: usuario destino nao encontrado', [
-                        'split_id' => $split->id,
+                    Log::warning('ProcessSplitPaymentJob: usuario destino nao encontrado', [
+                        'split_id'       => $split->id,
+                        'transaction_id' => $this->transactionId,
                     ]);
                     continue;
                 }
 
                 $splitAmount = $taxCalculator->calculateSplit($netAmount, $split->percentage);
 
+                // Bloqueia a row do usuário destino antes de creditar
+                // Previne race condition com outros créditos/débitos simultâneos
                 DB::table('users')
                     ->where('id', $split->target_user_id)
+                    ->lockForUpdate()
                     ->increment('balance', $splitAmount);
 
                 $split->update([
@@ -67,7 +84,7 @@ class ProcessSplitPaymentJob implements ShouldQueue
 
     public function failed(\Throwable $exception): void
     {
-        Log::error('ProcessSplitPaymentJob falhou', [
+        Log::error('ProcessSplitPaymentJob falhou definitivamente', [
             'transaction_id' => $this->transactionId,
             'error'          => $exception->getMessage(),
         ]);

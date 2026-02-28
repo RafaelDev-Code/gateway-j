@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\IntegrationKey;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
@@ -21,7 +22,7 @@ class IntegrationKeyFactory extends Factory
         return [
             'user_id'       => User::factory(),
             'client_id'     => 'gw_' . Str::random(32),
-            'client_secret' => hash('sha256', $rawSecret),
+            'client_secret' => Hash::make($rawSecret),
             'name'          => fake()->words(3, true),
             'description'   => fake()->sentence(),
             'domain'        => fake()->domainName(),
@@ -29,8 +30,27 @@ class IntegrationKeyFactory extends Factory
         ];
     }
 
+    /**
+     * forceFill necessário pois client_secret não está em $fillable
+     * (campo sensível protegido contra mass assignment).
+     */
+    public function newModel(array $attributes = []): IntegrationKey
+    {
+        return (new IntegrationKey())->forceFill($attributes);
+    }
+
     public function inactive(): static
     {
         return $this->state(fn () => ['active' => false]);
+    }
+
+    /**
+     * Retorna a factory com um secret bruto conhecido para uso em testes.
+     */
+    public function withRawSecret(string $rawSecret): static
+    {
+        return $this->state(fn () => [
+            'client_secret' => Hash::make($rawSecret),
+        ]);
     }
 }

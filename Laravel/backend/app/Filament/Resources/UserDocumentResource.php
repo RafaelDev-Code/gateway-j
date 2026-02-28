@@ -19,7 +19,7 @@ class UserDocumentResource extends Resource
     protected static ?string $navigationIcon  = 'heroicon-o-document-check';
     protected static ?string $navigationLabel = 'Documentos';
     protected static ?string $modelLabel      = 'Documento';
-    protected static ?int $navigationSort     = 4;
+    protected static ?int $navigationSort      = 4;
 
     public static function form(Form $form): Form
     {
@@ -102,11 +102,11 @@ class UserDocumentResource extends Resource
                     ->color('success')
                     ->requiresConfirmation()
                     ->action(function (UserDocument $record) {
-                        $record->update([
+                        $record->forceFill([
                             'status'      => DocumentStatus::APPROVED,
                             'reviewed_by' => auth()->id(),
                             'reviewed_at' => now(),
-                        ]);
+                        ])->save();
 
                         Notification::make()
                             ->title('Documento aprovado')
@@ -125,12 +125,12 @@ class UserDocumentResource extends Resource
                             ->required(),
                     ])
                     ->action(function (UserDocument $record, array $data) {
-                        $record->update([
+                        $record->forceFill([
                             'status'           => DocumentStatus::REJECTED,
                             'rejection_reason' => $data['rejection_reason'],
                             'reviewed_by'      => auth()->id(),
                             'reviewed_at'      => now(),
-                        ]);
+                        ])->save();
 
                         Notification::make()
                             ->title('Documento rejeitado')

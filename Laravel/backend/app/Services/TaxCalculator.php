@@ -8,62 +8,83 @@ use App\Models\User;
 class TaxCalculator
 {
     /**
-     * Calcula a taxa de cash-in para um usuario e valor.
-     * Taxas individuais tem prioridade sobre globais.
+     * Calcula a taxa de cash-in em centavos.
+     * Taxas individuais têm prioridade sobre a configuração global.
      *
-     * @return float Taxa em reais
+     * @param  int  $amountCents  Valor em centavos
+     * @return int  Taxa em centavos
      */
-    public function calculateCashIn(User $user, float $amount): float
+    public function calculateCashIn(User $user, int $amountCents): int
     {
         $config = GatewayConfig::current();
 
-        $taxPercent = $user->taxa_cashin_individual !== null
-            ? (float) $user->taxa_cashin_individual
-            : (float) $config->tax_cashin;
+        // taxa percentual (ex: 2.0 = 2%)
+        $ratePercent = $user->taxa_cashin_individual !== null
+            ? (string) $user->taxa_cashin_individual
+            : (string) $config->tax_cashin;
 
-        $taxMin = $user->taxa_min_individual !== null
-            ? (float) $user->taxa_min_individual
-            : (float) $config->tax_min;
+        // taxa mínima em reais -> centavos
+        $taxMinReais = $user->taxa_min_individual !== null
+            ? (string) $user->taxa_min_individual
+            : (string) $config->tax_min;
+        $taxMinCents = (int) bcmul($taxMinReais, '100', 0);
 
-        $calculated = ($amount * $taxPercent) / 100;
+        // taxa calculada: amountCents * (rate / 100)
+        $rateFraction = bcdiv($ratePercent, '100', 10);
+        $taxCents     = (int) bcmul((string) $amountCents, $rateFraction, 0);
 
-        return max($taxMin, round($calculated, 6));
+        return max($taxMinCents, $taxCents);
     }
 
     /**
-     * Calcula a taxa de cash-out para um usuario e valor.
+     * Calcula a taxa de cash-out em centavos.
+     *
+     * @param  int  $amountCents  Valor em centavos
+     * @return int  Taxa em centavos
      */
-    public function calculateCashOut(User $user, float $amount): float
+    public function calculateCashOut(User $user, int $amountCents): int
     {
         $config = GatewayConfig::current();
 
-        $taxPercent = $user->taxa_cashout_individual !== null
-            ? (float) $user->taxa_cashout_individual
-            : (float) $config->tax_cashout;
+        // taxa percentual (ex: 2.0 = 2%)
+        $ratePercent = $user->taxa_cashout_individual !== null
+            ? (string) $user->taxa_cashout_individual
+            : (string) $config->tax_cashout;
 
-        $taxMin = $user->taxa_min_individual !== null
-            ? (float) $user->taxa_min_individual
-            : (float) $config->tax_min;
+        // taxa mínima em reais -> centavos
+        $taxMinReais = $user->taxa_min_individual !== null
+            ? (string) $user->taxa_min_individual
+            : (string) $config->tax_min;
+        $taxMinCents = (int) bcmul($taxMinReais, '100', 0);
 
-        $calculated = ($amount * $taxPercent) / 100;
+        // taxa calculada: amountCents * (rate / 100)
+        $rateFraction = bcdiv($ratePercent, '100', 10);
+        $taxCents     = (int) bcmul((string) $amountCents, $rateFraction, 0);
 
-        return max($taxMin, round($calculated, 6));
+        return max($taxMinCents, $taxCents);
     }
 
     /**
-     * Calcula o valor do split baseado no percentual.
+     * Calcula o valor do split em centavos baseado no percentual.
+     *
+     * @param  int  $netAmountCents  Valor líquido em centavos
+     * @param  int  $percentage      Percentual (1-100)
+     * @return int  Valor do split em centavos
      */
-    public function calculateSplit(float $netAmount, int $percentage): float
+    public function calculateSplit(int $netAmountCents, int $percentage): int
     {
-        return round(($netAmount * $percentage) / 100, 6);
+        return (int) bcmul((string) $netAmountCents, bcdiv((string) $percentage, '100', 10), 0);
     }
 
     /**
-     * Calcula o total necessario para um cash-out (valor + taxa).
+     * Calcula o total necessário para um cash-out em centavos (valor + taxa).
+     *
+     * @param  int  $amountCents  Valor em centavos
+     * @return int  Total em centavos (valor + taxa)
      */
-    public function totalForCashOut(User $user, float $amount): float
+    public function totalForCashOut(User $user, int $amountCents): int
     {
-        $tax = $this->calculateCashOut($user, $amount);
-        return round($amount + $tax, 6);
+        $tax = $this->calculateCashOut($user, $amountCents);
+        return $amountCents + $tax;
     }
 }

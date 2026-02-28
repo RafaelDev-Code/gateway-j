@@ -1,0 +1,70 @@
+## docker-compose.dev-standalone.yml
+## Setup 100% local sem herdar configs de producao.
+## Uso: docker compose -f docker-compose.dev-standalone.yml up -d
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: gateway_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gateway
+      POSTGRES_USER: gateway_user
+      POSTGRES_PASSWORD: gateway_pass_local
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway_user -d gateway"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gateway_dev
+
+  redis:
+    image: redis:7-alpine
+    container_name: gateway_redis
+    restart: unless-stopped
+    command: redis-server --requirepass redis_pass_local --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_pass_local", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gateway_dev
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: base
+    image: backend-octane
+    container_name: gateway_app
+    restart: unless-stopped
+    command: php artisan octane:start --server=swoole --host=0.0.0.0 --port=8000
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gateway_dev
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  gateway_dev:
+    driver: bridge

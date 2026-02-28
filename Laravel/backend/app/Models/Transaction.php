@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,27 +12,22 @@ use Illuminate\Support\Facades\Crypt;
 
 class Transaction extends Model
 {
+    use HasFactory;
     protected $primaryKey = 'id';
     public $incrementing  = false;
     protected $keyType    = 'string';
 
-    protected $fillable = [
-        'id',
-        'end2end',
-        'external_id',
+    /**
+     * Campos críticos protegidos contra mass assignment (MEDIUM-20).
+     * user_id, amount, tax, status, type NUNCA devem ser preenchidos via input do usuário.
+     * Use forceFill() nos Action/Job classes onde esses campos precisam ser setados internamente.
+     */
+    protected $guarded = [
         'user_id',
         'amount',
         'tax',
         'status',
         'type',
-        'nome',
-        'descricao',
-        'document',
-        'postback_url',
-        'postback_status',
-        'is_api',
-        'is_internal',
-        'confirmed_at',
     ];
 
     /**
@@ -46,8 +42,8 @@ class Transaction extends Model
         return [
             'status'       => TransactionStatus::class,
             'type'         => TransactionType::class,
-            'amount'       => 'decimal:6',
-            'tax'          => 'decimal:6',
+            'amount'       => 'integer',
+            'tax'          => 'integer',
             'is_api'       => 'boolean',
             'is_internal'  => 'boolean',
             'confirmed_at' => 'datetime',
@@ -91,9 +87,12 @@ class Transaction extends Model
         return $this->status === TransactionStatus::PAID;
     }
 
-    public function netAmount(): float
+    /**
+     * Retorna o valor líquido em centavos (int).
+     */
+    public function netAmount(): int
     {
-        return (float) $this->amount - (float) $this->tax;
+        return (int) $this->amount - (int) $this->tax;
     }
 
     // --------------------------------------------------------

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Zap, BarChart2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Zap, BarChart2, Loader2 } from "lucide-react";
 import logoImg from "../../assets/logo.webp";
+import { useAuth } from "../../contexts/AuthContext";
+import { apiJson } from "../../api/client";
 
 const FEATURES = [
   { icon: ShieldCheck, title: "Segurança bancária",       desc: "Criptografia AES-256 e TLS 1.3 em todas as operações." },
@@ -11,11 +13,36 @@ const FEATURES = [
 
 export function Login() {
   const navigate = useNavigate();
+  const { login, isAuthenticated } = useAuth();
   const [showPass, setShowPass] = useState(false);
   const [form, setForm] = useState({ email: "", senha: "" });
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const set = (k) => (e) => { setForm((f) => ({ ...f, [k]: e.target.value })); setError(""); };
 
-  const handleSubmit = (e) => { e.preventDefault(); navigate("/"); };
+  if (isAuthenticated) {
+    navigate("/", { replace: true });
+    return null;
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await apiJson("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: form.email, password: form.senha }),
+      });
+      login(res.token, res.user);
+      navigate("/", { replace: true });
+    } catch (err) {
+      const msg = err?.data?.message ?? err?.data?.errors?.email?.[0] ?? err?.message ?? "Credenciais inválidas. Tente novamente.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="auth-shell">
@@ -83,8 +110,9 @@ export function Login() {
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary auth-submit-btn">
-              Entrar <ArrowRight size={15} />
+            {error && <p className="field-error" style={{ marginTop: 0 }}>{error}</p>}
+            <button type="submit" className="btn btn-primary auth-submit-btn" disabled={loading}>
+              {loading ? <><Loader2 size={15} className="spin" /> Entrando...</> : <>Entrar <ArrowRight size={15} /></>}
             </button>
           </form>
 

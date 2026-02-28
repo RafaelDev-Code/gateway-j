@@ -7,6 +7,7 @@ use App\DTOs\CashOutDTO;
 use App\DTOs\WebhookPayloadDTO;
 use App\Enums\TransactionStatus;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class StrikeAcquirer extends BaseAcquirer
 {
@@ -64,7 +65,8 @@ class StrikeAcquirer extends BaseAcquirer
         $secret = $this->config('webhook_secret');
 
         if (empty($secret)) {
-            return true;
+            Log::critical('Strike webhook_secret nao configurado — requisicao rejeitada.', ['ip' => $request->ip()]);
+            return false;
         }
 
         $signature = $request->header('X-Strike-Signature', '');
@@ -86,7 +88,7 @@ class StrikeAcquirer extends BaseAcquirer
         return new WebhookPayloadDTO(
             externalId: $payload['id'] ?? '',
             status:     $statusMap[$payload['status'] ?? ''] ?? TransactionStatus::PENDING,
-            amount:     isset($payload['amount']) ? $payload['amount'] / 100 : 0,
+            amountCents: isset($payload['amount']) ? (int) $payload['amount'] : 0,
             end2end:    $payload['end2end_id'] ?? null,
         );
     }

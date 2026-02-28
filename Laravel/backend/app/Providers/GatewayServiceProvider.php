@@ -68,7 +68,45 @@ class GatewayServiceProvider extends ServiceProvider
         RateLimiter::for('admin', function (Request $request) {
             return Limit::perMinute(
                 config('gateway.rate_limits.admin_login', 5)
-            )->by($request->ip());
+            )->by($request->ip())
+             ->response(fn () => response()->json(
+                 ['message' => 'Muitas tentativas de login. Aguarde e tente novamente.'],
+                 429
+             ));
+        });
+
+        // Registro: 5 contas/hora por IP (previne criacao em massa de contas)
+        RateLimiter::for('register', function (Request $request) {
+            return Limit::perHour(
+                config('gateway.rate_limits.register', 5)
+            )->by($request->ip())
+             ->response(fn () => response()->json(
+                 ['message' => 'Limite de cadastros atingido. Tente novamente mais tarde.'],
+                 429
+             ));
+        });
+
+        // PIN: 5 tentativas/15 min por user_id (protege brute-force 0000-9999)
+        RateLimiter::for('pin', function (Request $request) {
+            $key = $request->user()?->id ?? $request->ip();
+            return Limit::perMinutes(15,
+                config('gateway.rate_limits.pin', 5)
+            )->by($key)
+             ->response(fn () => response()->json(
+                 ['message' => 'Muitas tentativas de PIN. Aguarde 15 minutos.'],
+                 429
+             ));
+        });
+
+        // Forgot-password: 5 req/hora por IP
+        RateLimiter::for('forgot_password', function (Request $request) {
+            return Limit::perHour(
+                config('gateway.rate_limits.forgot_password', 5)
+            )->by($request->ip())
+             ->response(fn () => response()->json(
+                 ['message' => 'Muitas solicitacoes de recuperacao de senha. Tente mais tarde.'],
+                 429
+             ));
         });
     }
 }

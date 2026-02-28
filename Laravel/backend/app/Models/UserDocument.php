@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserDocument extends Model
 {
+    /**
+     * Campos aceitos via mass assignment (input do usuário).
+     * status e reviewed_by só podem ser setados via forceFill() pelo sistema admin.
+     */
     protected $fillable = [
         'user_id',
         'type',
@@ -15,9 +19,7 @@ class UserDocument extends Model
         'file_hash',
         'mime_type',
         'file_size',
-        'status',
         'rejection_reason',
-        'reviewed_by',
         'reviewed_at',
     ];
 

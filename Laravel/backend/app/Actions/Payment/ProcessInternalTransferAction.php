@@ -19,7 +19,7 @@ class ProcessInternalTransferAction
         private readonly TaxCalculator $taxCalculator,
     ) {}
 
-    public function execute(User $sender, string $targetUsername, float $amount, string $pin): array
+    public function execute(User $sender, string $targetUsername, int $amountCents, string $pin): array
     {
         // Valida PIN
         if (! $sender->hasPin() || ! $sender->verifyPin($pin)) {
@@ -38,54 +38,56 @@ class ProcessInternalTransferAction
             throw new \RuntimeException('Nao e possivel transferir para si mesmo.');
         }
 
-        $tax   = $this->taxCalculator->calculateCashOut($sender, $amount);
-        $total = $amount + $tax;
+        $taxCents   = $this->taxCalculator->calculateCashOut($sender, $amountCents);
+        $totalCents = $amountCents + $taxCents;
 
         // Transacao atomica: debita origem, credita destino, cria registros
-        $result = DB::transaction(function () use ($sender, $recipient, $amount, $tax, $total) {
+        $result = DB::transaction(function () use ($sender, $recipient, $amountCents, $taxCents, $totalCents) {
             // Lock ambos os usuarios para evitar race conditions
             $lockedSender    = User::lockForUpdate()->find($sender->id);
             $lockedRecipient = User::lockForUpdate()->find($recipient->id);
 
-            if ($lockedSender->balance < $total) {
+            if ($lockedSender->balance < $totalCents) {
                 throw new InsufficientBalanceException();
             }
 
-            $lockedSender->decrement('balance', $total);
-            $lockedRecipient->increment('balance', $amount); // Destinatario recebe valor cheio
+            $lockedSender->decrement('balance', $totalCents);
+            $lockedRecipient->increment('balance', $amountCents); // Destinatario recebe valor cheio (sem taxa)
 
             $txIdOut = config('gateway.transaction_prefix', 'e') . Str::random(32);
             $txIdIn  = config('gateway.transaction_prefix', 'e') . Str::random(32);
 
-            // Registro do sender (saida)
-            $senderTx = Transaction::create([
-                'id'         => $txIdOut,
-                'external_id'=> $txIdIn,
-                'user_id'    => $lockedSender->id,
-                'amount'     => $amount,
-                'tax'        => $tax,
-                'status'     => TransactionStatus::PAID,
-                'type'       => TransactionType::INTERNAL_TRANSFER,
-                'nome'       => $lockedRecipient->name,
-                'descricao'  => "Transferencia para {$lockedRecipient->username}",
-                'is_internal'=> true,
-                'confirmed_at'=> now(),
+            // Registro do sender (saida) — forceFill pois campos críticos estão em $guarded
+            $senderTx = (new Transaction())->forceFill([
+                'id'          => $txIdOut,
+                'external_id' => $txIdIn,
+                'user_id'     => $lockedSender->id,
+                'amount'      => $amountCents,
+                'tax'         => $taxCents,
+                'status'      => TransactionStatus::PAID,
+                'type'        => TransactionType::INTERNAL_TRANSFER,
+                'nome'        => $lockedRecipient->name,
+                'descricao'   => "Transferencia para {$lockedRecipient->username}",
+                'is_internal' => true,
+                'confirmed_at' => now(),
             ]);
+            $senderTx->save();
 
             // Registro do recipient (entrada)
-            $recipientTx = Transaction::create([
-                'id'         => $txIdIn,
-                'external_id'=> $txIdOut,
-                'user_id'    => $lockedRecipient->id,
-                'amount'     => $amount,
-                'tax'        => 0,
-                'status'     => TransactionStatus::PAID,
-                'type'       => TransactionType::DEPOSIT,
-                'nome'       => $lockedSender->name,
-                'descricao'  => "Transferencia de {$lockedSender->username}",
-                'is_internal'=> true,
-                'confirmed_at'=> now(),
+            $recipientTx = (new Transaction())->forceFill([
+                'id'          => $txIdIn,
+                'external_id' => $txIdOut,
+                'user_id'     => $lockedRecipient->id,
+                'amount'      => $amountCents,
+                'tax'         => 0,
+                'status'      => TransactionStatus::PAID,
+                'type'        => TransactionType::DEPOSIT,
+                'nome'        => $lockedSender->name,
+                'descricao'   => "Transferencia de {$lockedSender->username}",
+                'is_internal' => true,
+                'confirmed_at' => now(),
             ]);
+            $recipientTx->save();
 
             return [$senderTx, $recipientTx];
         });

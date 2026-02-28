@@ -42,15 +42,16 @@ class IntegrationKeyController extends Controller
 
         $rawSecret = IntegrationKey::generateClientSecret();
 
-        $key = IntegrationKey::create([
+        $key = (new IntegrationKey())->forceFill([
             'user_id'       => $user->id,
             'client_id'     => IntegrationKey::generateClientId(),
-            'client_secret' => hash('sha256', $rawSecret),
+            'client_secret' => \Illuminate\Support\Facades\Hash::make($rawSecret),
             'name'          => $request->name,
             'description'   => $request->description,
             'domain'        => $request->domain,
             'active'        => true,
         ]);
+        $key->save();
 
         AuditLog::create([
             'user_id'    => $user->id,

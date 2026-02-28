@@ -2,19 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\DTOs\WebhookPayloadDTO;
 use App\Enums\AcquirerType;
 use App\Enums\TransactionStatus;
 use App\Enums\TransactionType;
 use App\Jobs\ProcessWebhookJob;
 use App\Models\Transaction;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class WebhookTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     private User $user;
 
@@ -27,6 +28,7 @@ class WebhookTest extends TestCase
         ]);
 
         config([
+            'acquirers.pagpix.active'         => true,
             'acquirers.pagpix.webhook_secret' => 'test_webhook_secret_pagpix',
         ]);
     }
@@ -36,7 +38,7 @@ class WebhookTest extends TestCase
         $payload = json_encode(['id' => 'ext_001', 'status' => 'PAID']);
 
         $response = $this->postJson('/api/v1/webhooks/pagpix', json_decode($payload, true), [
-            'X-Signature' => 'invalid_signature',
+            'X-PagPix-Signature' => 'assinatura_invalida_propositalmente',
         ]);
 
         $response->assertStatus(401);
@@ -46,14 +48,15 @@ class WebhookTest extends TestCase
     {
         Queue::fake();
 
-        $payload = json_encode(['id' => 'ext_001', 'status' => 'PAID', 'amount' => 100]);
+        $payload = json_encode(['id' => 'ext_001', 'status' => 'PAID', 'amount' => 10000]);
 
+        // PagPix usa X-PagPix-Signature
         $validSignature = hash_hmac('sha256', $payload, 'test_webhook_secret_pagpix');
 
         $response = $this->postJson(
             '/api/v1/webhooks/pagpix',
             json_decode($payload, true),
-            ['X-Signature' => $validSignature]
+            ['X-PagPix-Signature' => $validSignature]
         );
 
         $response->assertStatus(200);
@@ -63,31 +66,33 @@ class WebhookTest extends TestCase
 
     public function test_webhook_updates_transaction_status_to_paid(): void
     {
+        // Valores em centavos (10000 = R$100,00; 150 = R$1,50)
         $transaction = Transaction::factory()->create([
             'user_id'     => $this->user->id,
             'external_id' => 'ext_webhook_001',
-            'amount'      => 100.00,
-            'tax'         => 1.50,
+            'amount'      => 10000, // centavos
+            'tax'         => 150,   // centavos
             'status'      => TransactionStatus::PENDING,
             'type'        => TransactionType::DEPOSIT,
         ]);
 
-        $payload = \App\DTOs\WebhookPayloadDTO::fromArray([
+        $payload = WebhookPayloadDTO::fromArray([
             'external_id' => 'ext_webhook_001',
             'status'      => TransactionStatus::PAID,
             'end2end'     => 'E2E001',
-            'amount'      => 100.00,
+            'amount'      => 100.00, // em reais; fromArray() converte para centavos
             'paid_at'     => now()->toISOString(),
         ]);
 
-        $job = new \App\Jobs\ProcessWebhookJob(AcquirerType::PAGPIX, $payload);
+        $job = new ProcessWebhookJob(AcquirerType::PAGPIX, $payload);
         $job->handle();
 
         $transaction->refresh();
         $this->assertEquals(TransactionStatus::PAID, $transaction->status);
 
         $this->user->refresh();
-        $this->assertEquals(98.50, (float) $this->user->balance);
+        // netAmount = 10000 - 150 = 9850 centavos (R$98,50)
+        $this->assertEquals(9850, (int) $this->user->balance);
     }
 
     public function test_webhook_is_idempotent(): void
@@ -95,14 +100,14 @@ class WebhookTest extends TestCase
         $transaction = Transaction::factory()->paid()->create([
             'user_id'     => $this->user->id,
             'external_id' => 'ext_webhook_002',
-            'amount'      => 100.00,
-            'tax'         => 1.50,
+            'amount'      => 10000, // centavos
+            'tax'         => 150,   // centavos
             'type'        => TransactionType::DEPOSIT,
         ]);
 
-        $initialBalance = (float) $this->user->balance;
+        $initialBalance = (int) $this->user->balance;
 
-        $payload = \App\DTOs\WebhookPayloadDTO::fromArray([
+        $payload = WebhookPayloadDTO::fromArray([
             'external_id' => 'ext_webhook_002',
             'status'      => TransactionStatus::PAID,
             'end2end'     => 'E2E002',
@@ -110,10 +115,10 @@ class WebhookTest extends TestCase
             'paid_at'     => now()->toISOString(),
         ]);
 
-        $job = new \App\Jobs\ProcessWebhookJob(AcquirerType::PAGPIX, $payload);
+        $job = new ProcessWebhookJob(AcquirerType::PAGPIX, $payload);
         $job->handle();
 
         $this->user->refresh();
-        $this->assertEquals($initialBalance, (float) $this->user->balance);
+        $this->assertEquals($initialBalance, (int) $this->user->balance);
     }
 }

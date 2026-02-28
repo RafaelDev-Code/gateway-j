@@ -1,19 +1,18 @@
-import { useState, useRef } from "react";
-import { Mail, Camera, BadgeCheck, Globe, X, Eye, EyeOff, Percent, Pencil, Check } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Mail, Camera, BadgeCheck, Globe, X, Eye, EyeOff, Percent, Pencil, Check, Loader2 } from "lucide-react";
+import { apiJson } from "../../api/client";
+import { useAuth } from "../../contexts/AuthContext";
 
-/* Dados fixos (read-only — vindos do backend) */
-const DADOS = {
-  nome:      "Rafael Araujo",
-  email:     "rafael@gatewayjj.com",
-  telefone:  "(11) 99999-0000",
-  empresa:   "Gateway JJ",
-  documento: "12.345.678/0001-99",
-  nicho:     "E-commerce",
-  ticket:    "R$ 1.000 – R$ 5.000",
-};
+function formatDoc(v) {
+  if (!v) return "—";
+  const s = String(v).replace(/\D/g, "");
+  if (s.length === 11) return s.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  if (s.length === 14) return s.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+  return v;
+}
 
-/* Taxas do usuário (vindas do backend) */
-const TAXAS = [
+/* Taxas do usuário (mock até endpoint de taxas no backend) */
+const TAXAS_FALLBACK = [
   { label: "Pix",               valor: "0,99%"           },
   { label: "Cartão de Crédito", valor: "2,49% + R$ 0,30" },
   { label: "Cartão de Débito",  valor: "1,49%"           },
@@ -43,24 +42,64 @@ function Divider() {
 }
 
 export function MinhaConta() {
-  const [avatar,       setAvatar]       = useState(null);
+  const { setUserData } = useAuth();
+  const [meData, setMeData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [avatar, setAvatar] = useState(null);
 
-  /* Edição inline do site */
-  const [site,         setSite]         = useState("https://gatewayjj.com");
-  const [siteOriginal, setSiteOriginal] = useState("https://gatewayjj.com");
-  const [siteEdit,     setSiteEdit]     = useState(false);
-  const [siteSalvo,    setSiteSalvo]    = useState(false);
+  const [site, setSite] = useState("");
+  const [siteOriginal, setSiteOriginal] = useState("");
+  const [siteEdit, setSiteEdit] = useState(false);
+  const [siteSalvo, setSiteSalvo] = useState(false);
+  const [siteSaving, setSiteSaving] = useState(false);
+  const [siteErr, setSiteErr] = useState("");
 
-  /* Modal alterar e-mail */
-  const [modalEmail,   setModalEmail]   = useState(false);
-  const [emailNovo,    setEmailNovo]    = useState("");
-  const [emailConf,    setEmailConf]    = useState("");
+  const [modalEmail, setModalEmail] = useState(false);
+  const [emailNovo, setEmailNovo] = useState("");
+  const [emailConf, setEmailConf] = useState("");
   const [verEmailConf, setVerEmailConf] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailErr, setEmailErr] = useState("");
 
   const fileRef = useRef(null);
   const siteInputRef = useRef(null);
 
-  const initials = DADOS.nome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+  const reloadMe = () => {
+    return apiJson("/auth/me").then((r) => {
+      const d = r?.data ?? r;
+      setMeData(d || null);
+      return d;
+    });
+  };
+
+  useEffect(() => {
+    apiJson("/auth/me")
+      .then((r) => {
+        const d = r?.data ?? r;
+        setMeData(d || null);
+        const s = d?.site || "";
+        setSite(s);
+        setSiteOriginal(s);
+      })
+      .catch(() => setMeData(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const DADOS = meData
+    ? {
+        nome: meData.name ?? "—",
+        email: meData.email ?? "—",
+        telefone: meData.telefone ?? "—",
+        documento: formatDoc(meData.cnpj),
+        empresa: meData.empresa ?? "—",
+        nicho: meData.nicho ?? "—",
+        ticket: meData.ticket ?? "—",
+        id: meData.id,
+      }
+    : { nome: "—", email: "—", telefone: "—", documento: "—", empresa: "—", nicho: "—", ticket: "—", id: "" };
+
+  const TAXAS = TAXAS_FALLBACK;
+  const initials = (DADOS.nome || "?").split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "?";
 
   const handleAvatar = (e) => {
     const file = e.target.files?.[0];
@@ -78,18 +117,43 @@ export function MinhaConta() {
     setSiteEdit(false);
   };
 
-  const salvarSite = () => {
-    setSiteOriginal(site);
-    setSiteEdit(false);
-    setSiteSalvo(true);
-    setTimeout(() => setSiteSalvo(false), 2500);
+  const salvarSite = async () => {
+    if (siteSaving) return;
+    setSiteSaving(true);
+    setSiteErr("");
+    try {
+      const r = await apiJson("/auth/me", { method: "PUT", body: { site } });
+      const d = r?.data ?? r;
+      const novoSite = d?.site || site;
+      setSiteOriginal(novoSite);
+      setSite(novoSite);
+      if (d) { setMeData(d); setUserData(d); }
+      setSiteEdit(false);
+      setSiteSalvo(true);
+      setTimeout(() => setSiteSalvo(false), 2500);
+    } catch (err) {
+      setSiteErr(err?.message || "Erro ao salvar.");
+    } finally {
+      setSiteSaving(false);
+    }
   };
 
-  const handleSalvarEmail = () => {
-    if (emailNovo && emailNovo === emailConf) {
+  const handleSalvarEmail = async () => {
+    if (!emailNovo || emailNovo !== emailConf || emailSaving) return;
+    setEmailSaving(true);
+    setEmailErr("");
+    try {
+      const r = await apiJson("/auth/me", { method: "PUT", body: { email: emailNovo } });
+      const d = r?.data ?? r;
+      if (d) { setMeData(d); setUserData(d); }
       setModalEmail(false);
       setEmailNovo("");
       setEmailConf("");
+    } catch (err) {
+      const msg = err?.errors?.email?.[0] || err?.message || "Erro ao alterar e-mail.";
+      setEmailErr(msg);
+    } finally {
+      setEmailSaving(false);
     }
   };
 
@@ -99,6 +163,14 @@ export function MinhaConta() {
     gap: "14px 20px",
     padding: "14px 18px 18px",
   };
+
+  if (loading && !meData) {
+    return (
+      <div className="page-header animate-fade-in">
+        <p className="page-subtitle">Carregando...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -161,25 +233,29 @@ export function MinhaConta() {
 
                 {siteEdit ? (
                   /* Modo edição */
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <div className="form-icon-wrap" style={{ flex: 1, maxWidth: 320 }}>
-                      <Globe size={12} className="form-icon" />
-                      <input
-                        ref={siteInputRef}
-                        className="form-input"
-                        value={site}
-                        onChange={(e) => setSite(e.target.value)}
-                        placeholder="https://seusite.com.br"
-                        onKeyDown={(e) => { if (e.key === "Enter") salvarSite(); if (e.key === "Escape") cancelarSite(); }}
-                        style={{ height: 32, fontSize: 13 }}
-                      />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <div className="form-icon-wrap" style={{ flex: 1, maxWidth: 320 }}>
+                        <Globe size={12} className="form-icon" />
+                        <input
+                          ref={siteInputRef}
+                          className="form-input"
+                          value={site}
+                          onChange={(e) => setSite(e.target.value)}
+                          placeholder="https://seusite.com.br"
+                          onKeyDown={(e) => { if (e.key === "Enter") salvarSite(); if (e.key === "Escape") cancelarSite(); }}
+                          style={{ height: 32, fontSize: 13 }}
+                          disabled={siteSaving}
+                        />
+                      </div>
+                      <button className="btn btn-ghost btn-icon" style={{ width: 28, height: 28, color: "var(--text-3)" }} onClick={cancelarSite} title="Cancelar" disabled={siteSaving}>
+                        <X size={12} />
+                      </button>
+                      <button className="btn btn-primary btn-sm" style={{ height: 28, gap: 5, fontSize: 12, paddingInline: 10 }} onClick={salvarSite} disabled={siteSaving}>
+                        {siteSaving ? <Loader2 size={12} className="spin" /> : <Check size={12} />} Salvar
+                      </button>
                     </div>
-                    <button className="btn btn-ghost btn-icon" style={{ width: 28, height: 28, color: "var(--text-3)" }} onClick={cancelarSite} title="Cancelar">
-                      <X size={12} />
-                    </button>
-                    <button className="btn btn-primary btn-sm" style={{ height: 28, gap: 5, fontSize: 12, paddingInline: 10 }} onClick={salvarSite}>
-                      <Check size={12} /> Salvar
-                    </button>
+                    {siteErr && <p style={{ fontSize: 12, color: "var(--red)", marginTop: 2 }}>{siteErr}</p>}
                   </div>
                 ) : (
                   /* Modo visualização */
@@ -238,7 +314,7 @@ export function MinhaConta() {
                 <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>{DADOS.email}</p>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 6, padding: "2px 7px" }}>
                   <span style={{ fontSize: 10, color: "var(--text-3)" }}>ID</span>
-                  <span style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, color: "var(--text-2)", letterSpacing: ".02em" }}>4242423</span>
+                  <span style={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, color: "var(--text-2)", letterSpacing: ".02em" }}>{DADOS.id ?? "—"}</span>
                 </span>
               </div>
               <span className="badge badge-green" style={{ fontSize: 10 }}><BadgeCheck size={10} /> Conta verificada</span>
@@ -277,14 +353,14 @@ export function MinhaConta() {
 
       {/* Modal alterar e-mail */}
       {modalEmail && (
-        <div className="modal-backdrop" onClick={() => setModalEmail(false)}>
+        <div className="modal-backdrop" onClick={() => { if (!emailSaving) setModalEmail(false); }}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <div>
                 <p className="modal-titulo">Alterar e-mail</p>
-                <p className="modal-subtitulo">Você receberá um link de confirmação no novo e-mail.</p>
+                <p className="modal-subtitulo">O novo e-mail será atualizado imediatamente.</p>
               </div>
-              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setModalEmail(false)}>
+              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setModalEmail(false)} disabled={emailSaving}>
                 <X size={16} />
               </button>
             </div>
@@ -295,7 +371,7 @@ export function MinhaConta() {
                   <div className="form-icon-wrap">
                     <Mail size={13} className="form-icon" />
                     <input className="form-input" type="email" placeholder="novo@email.com"
-                      value={emailNovo} onChange={(e) => setEmailNovo(e.target.value)} />
+                      value={emailNovo} onChange={(e) => setEmailNovo(e.target.value)} disabled={emailSaving} />
                   </div>
                 </div>
                 <div>
@@ -308,6 +384,7 @@ export function MinhaConta() {
                       value={emailConf}
                       onChange={(e) => setEmailConf(e.target.value)}
                       style={{ paddingRight: 38 }}
+                      disabled={emailSaving}
                     />
                     <button type="button" onClick={() => setVerEmailConf((v) => !v)} style={{
                       position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
@@ -320,14 +397,15 @@ export function MinhaConta() {
                     <p style={{ fontSize: 12, color: "var(--red)", marginTop: 4 }}>Os e-mails não coincidem.</p>
                   )}
                 </div>
+                {emailErr && <p style={{ fontSize: 12, color: "var(--red)" }}>{emailErr}</p>}
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost btn-sm" onClick={() => setModalEmail(false)}>Cancelar</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setModalEmail(false)} disabled={emailSaving}>Cancelar</button>
               <button className="btn btn-primary btn-sm" style={{ gap: 6 }}
-                disabled={!emailNovo || emailNovo !== emailConf}
+                disabled={!emailNovo || emailNovo !== emailConf || emailSaving}
                 onClick={handleSalvarEmail}>
-                <Mail size={13} /> Enviar confirmação
+                {emailSaving ? <Loader2 size={13} className="spin" /> : <Mail size={13} />} Salvar e-mail
               </button>
             </div>
           </div>

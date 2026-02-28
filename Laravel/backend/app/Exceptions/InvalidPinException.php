@@ -14,6 +14,9 @@ class InvalidPinException extends RuntimeException
 
     public function render(): \Illuminate\Http\JsonResponse
     {
-        return response()->json(['message' => $this->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        return response()->json([
+            'message' => $this->getMessage(),
+            'error'   => 'INVALID_PIN',
+        ], Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 }

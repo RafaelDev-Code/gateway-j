@@ -8,6 +8,7 @@ use App\DTOs\WebhookPayloadDTO;
 use App\Enums\TransactionStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class WiteTecAcquirer extends BaseAcquirer
 {
@@ -84,7 +85,8 @@ class WiteTecAcquirer extends BaseAcquirer
         $secret = $this->config('webhook_secret');
 
         if (empty($secret)) {
-            return true;
+            Log::critical('WiteTec webhook_secret nao configurado — requisicao rejeitada.', ['ip' => $request->ip()]);
+            return false;
         }
 
         $signature = $request->header('X-WiteTec-Signature', '');
@@ -108,7 +110,7 @@ class WiteTecAcquirer extends BaseAcquirer
         return new WebhookPayloadDTO(
             externalId: $payload['data']['id'] ?? '',
             status:     $statusMap[$event] ?? TransactionStatus::PENDING,
-            amount:     isset($payload['data']['amount']) ? $payload['data']['amount'] / 100 : 0,
+            amountCents: isset($payload['data']['amount']) ? (int) $payload['data']['amount'] : 0,
             end2end:    $payload['data']['end2end'] ?? null,
         );
     }

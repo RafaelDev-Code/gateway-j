@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import logoImg from "../../assets/logo.webp";
 import iconeImg from "../../assets/icone.webp";
+import { useAuth } from "../../contexts/AuthContext";
 
 /* Seções com mini-título + itens sempre abertos (sem expandir/recolher) */
 const SECTIONS = [
@@ -54,7 +55,17 @@ function NavLinkItem({ item, collapsed, onClose }) {
   );
 }
 
-export function Sidebar({ collapsed, onToggle, isOpen, onClose }) {
+const fmt = (v) => {
+  const n = parseFloat(v);
+  if (isNaN(n)) return "—";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
+};
+
+export function Sidebar({ collapsed, onToggle, isOpen, onClose, unreadCount = 0 }) {
+  const { user } = useAuth();
+  const faturamento = user?.faturamento;
+  const faturamentoFmt = faturamento != null ? fmt(faturamento) : null;
+
   const cls = [
     "sidebar",
     collapsed ? "collapsed" : "",
@@ -88,28 +99,27 @@ export function Sidebar({ collapsed, onToggle, isOpen, onClose }) {
           {SECTIONS.map((section) => (
             <div key={section.title} className="sb-nav-block">
               <div className="sb-nav-section">{section.title}</div>
-              {section.items.map((item) => (
-                <NavLinkItem key={item.id} item={item} collapsed={collapsed} onClose={onClose} />
-              ))}
+              {section.items.map((item) => {
+                const itemWithBadge = item.id === "notificacoes"
+                  ? { ...item, badge: unreadCount > 0 ? unreadCount : undefined }
+                  : item;
+                return <NavLinkItem key={item.id} item={itemWithBadge} collapsed={collapsed} onClose={onClose} />;
+              })}
             </div>
           ))}
         </nav>
 
-        <div className="sb-faturamento">
-          <div className="sb-faturamento-head">
-            <div className="sb-faturamento-icon">
-              <TrendingUp size={14} strokeWidth={2} />
+        {faturamentoFmt && (
+          <div className="sb-faturamento">
+            <div className="sb-faturamento-head">
+              <div className="sb-faturamento-icon">
+                <TrendingUp size={14} strokeWidth={2} />
+              </div>
+              <span className="sb-faturamento-title">Seu faturamento</span>
             </div>
-            <span className="sb-faturamento-title">Seu faturamento</span>
+            <p className="sb-faturamento-valor">{faturamentoFmt}</p>
           </div>
-          <p className="sb-faturamento-valor">R$ 4.832,02</p>
-          <div className="sb-faturamento-bar">
-            <div className="sb-faturamento-bar-track">
-              <div className="sb-faturamento-bar-fill" style={{ width: "4.8%" }} />
-              <span className="sb-faturamento-bar-meta">Meta: R$ 100k</span>
-            </div>
-          </div>
-        </div>
+        )}
 
 
       </aside>

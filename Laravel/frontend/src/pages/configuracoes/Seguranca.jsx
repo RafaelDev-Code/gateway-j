@@ -1,5 +1,7 @@
 import { useState, useRef } from "react";
-import { Shield, Lock, Smartphone, Monitor, LogOut, Eye, EyeOff, CheckCircle2, KeyRound, QrCode, AlertCircle, X } from "lucide-react";
+import { Shield, Lock, Smartphone, Monitor, LogOut, Eye, EyeOff, CheckCircle2, KeyRound, QrCode, AlertCircle, X, Loader2 } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { apiJson } from "../../api/client";
 
 const SESSOES = [
   { id: 1, dispositivo: "Chrome — macOS",      ip: "177.92.14.5",   local: "São Paulo, BR",      atual: true,  ultima: "Agora"      },
@@ -26,10 +28,10 @@ function Modal({ titulo, subtitulo, onClose, children, footer }) {
   );
 }
 
-/* ─── 6 caixas de PIN ──────────────────────────────────────── */
-function PinBoxes({ value, onChange, error = false, label }) {
+/* ─── Caixas de PIN (4 ou 6 dígitos) ─────────────────────────── */
+function PinBoxes({ value, onChange, error = false, label, size = 6 }) {
   const refs = useRef([]);
-  const digits = value.split("").concat(Array(6).fill("")).slice(0, 6);
+  const digits = value.split("").concat(Array(size).fill("")).slice(0, size);
 
   const handleKey = (i, e) => {
     const key = e.key;
@@ -37,7 +39,7 @@ function PinBoxes({ value, onChange, error = false, label }) {
     if (key === "Backspace") {
       e.preventDefault();
       if (digits[i]) {
-        const next = digits.map((d, idx) => idx === i ? "" : d).join("").padEnd(6, "").slice(0, 6).trimEnd();
+        const next = digits.map((d, idx) => idx === i ? "" : d).join("").padEnd(size, "").slice(0, size).trimEnd();
         onChange(next);
       } else if (i > 0) {
         refs.current[i - 1]?.focus();
@@ -48,22 +50,22 @@ function PinBoxes({ value, onChange, error = false, label }) {
     }
 
     if (key === "ArrowLeft" && i > 0) { refs.current[i - 1]?.focus(); return; }
-    if (key === "ArrowRight" && i < 5) { refs.current[i + 1]?.focus(); return; }
+    if (key === "ArrowRight" && i < size - 1) { refs.current[i + 1]?.focus(); return; }
 
     if (/^\d$/.test(key)) {
       e.preventDefault();
       const arr = [...digits];
       arr[i] = key;
       onChange(arr.join("").trimEnd());
-      if (i < 5) refs.current[i + 1]?.focus();
+      if (i < size - 1) refs.current[i + 1]?.focus();
     }
   };
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, size);
     onChange(pasted);
-    const focusIdx = Math.min(pasted.length, 5);
+    const focusIdx = Math.min(pasted.length, size - 1);
     refs.current[focusIdx]?.focus();
   };
 
@@ -86,7 +88,7 @@ function PinBoxes({ value, onChange, error = false, label }) {
               width: 46, height: 52,
               textAlign: "center",
               fontSize: 22, fontWeight: 700,
-              border: `2px solid ${error && value.length === 6 ? "var(--red)" : d ? "var(--accent)" : "var(--border)"}`,
+              border: `2px solid ${error && value.length === size ? "var(--red)" : d ? "var(--accent)" : "var(--border)"}`,
               borderRadius: "var(--radius-sm)",
               background: "var(--surface-2)",
               color: "var(--text-1)",
@@ -95,8 +97,8 @@ function PinBoxes({ value, onChange, error = false, label }) {
               transition: "border-color var(--dur)",
               cursor: "text",
             }}
-            onFocus={(e) => e.target.style.borderColor = error && value.length === 6 ? "var(--red)" : "var(--accent)"}
-            onBlur={(e) => e.target.style.borderColor = error && value.length === 6 ? "var(--red)" : d ? "var(--accent)" : "var(--border)"}
+            onFocus={(e) => e.target.style.borderColor = error && value.length === size ? "var(--red)" : "var(--accent)"}
+            onBlur={(e) => e.target.style.borderColor = error && value.length === size ? "var(--red)" : d ? "var(--accent)" : "var(--border)"}
           />
         ))}
       </div>
@@ -124,35 +126,84 @@ function SenhaInput({ label, value, onChange, placeholder }) {
   );
 }
 
+const PIN_LEN = 4;
+
 export function Seguranca() {
-  const [modal, setModal] = useState(null); // "senha" | "2fa" | "pin" | "sessoes"
+  const { user, setUserData } = useAuth();
+  const has_pin = user?.has_pin ?? false;
+  const [modal, setModal] = useState(null);
 
-  /* Senha */
-  const [senhas,   setSenhas]   = useState({ atual: "", nova: "", confirm: "" });
+  const [senhas, setSenhas] = useState({ atual: "", nova: "", confirm: "" });
   const setSenha = (k) => (e) => setSenhas((s) => ({ ...s, [k]: e.target.value }));
-  const senhaOk  = senhas.atual && senhas.nova.length >= 8 && senhas.nova === senhas.confirm;
+  const senhaOk = senhas.atual && senhas.nova.length >= 8 && senhas.nova === senhas.confirm;
+  const [senhaLoading, setSenhaLoading] = useState(false);
+  const [senhaSalva, setSenhaSalva] = useState(false);
+  const [senhaErr, setSenhaErr] = useState("");
 
-  /* 2FA */
   const [twoFA, setTwoFA] = useState(false);
 
-  /* PIN */
-  const [pin,     setPin]     = useState("");
+  const [pin, setPin] = useState("");
   const [pinConf, setPinConf] = useState("");
+  const [pinAtual, setPinAtual] = useState("");
   const [pinSalvo, setPinSalvo] = useState(false);
-  const pinOk = pin.length === 6 && pin === pinConf;
+  const [pinLoading, setPinLoading] = useState(false);
+  const [pinError, setPinError] = useState("");
+  const pinOk = pin.length === PIN_LEN && pin === pinConf;
+  const pinAlterarOk = has_pin && pinAtual.length === PIN_LEN && pinOk;
 
-  const handleSalvarPin = () => {
-    if (pinOk) { setPinSalvo(true); setTimeout(() => { setPinSalvo(false); setModal(null); }, 1500); }
+  const handleSalvarPin = async () => {
+    if (!pinOk && !pinAlterarOk) return;
+    setPinError("");
+    setPinLoading(true);
+    try {
+      if (has_pin) {
+        await apiJson("/pin", { method: "PUT", body: JSON.stringify({ current_pin: pinAtual, pin, pin_confirmation: pinConf }) });
+      } else {
+        await apiJson("/pin", { method: "POST", body: JSON.stringify({ pin, pin_confirmation: pinConf }) });
+      }
+      setPinSalvo(true);
+      const me = await apiJson("/auth/me");
+      if (me?.data) setUserData(me.data);
+      setTimeout(() => { setPinSalvo(false); fechar(); setModal(null); }, 1500);
+    } catch (err) {
+      setPinError(err?.data?.message || err?.message || "Falha ao salvar PIN.");
+    } finally {
+      setPinLoading(false);
+    }
   };
 
   /* Sessões */
   const [sessoes, setSessoes] = useState(SESSOES);
   const encerrar = (id) => setSessoes((s) => s.filter((x) => x.id === 1 || x.id !== id));
 
+  const handleSalvarSenha = async () => {
+    if (!senhaOk || senhaLoading) return;
+    setSenhaLoading(true);
+    setSenhaErr("");
+    try {
+      await apiJson("/auth/password", {
+        method: "PUT",
+        body: { current_password: senhas.atual, password: senhas.nova, password_confirmation: senhas.confirm },
+      });
+      setSenhaSalva(true);
+      setTimeout(() => { setSenhaSalva(false); fechar(); }, 1500);
+    } catch (err) {
+      setSenhaErr(
+        err?.errors?.current_password?.[0]
+          || err?.errors?.password?.[0]
+          || err?.message
+          || "Erro ao alterar senha."
+      );
+    } finally {
+      setSenhaLoading(false);
+    }
+  };
+
   const fechar = () => {
     setModal(null);
     setSenhas({ atual: "", nova: "", confirm: "" });
-    setPin(""); setPinConf("");
+    setSenhaErr(""); setSenhaSalva(false);
+    setPin(""); setPinConf(""); setPinAtual(""); setPinError("");
   };
 
   /* Cards de segurança */
@@ -179,8 +230,9 @@ export function Seguranca() {
       icon: <KeyRound size={20} style={{ color: "var(--yellow)" }} />,
       bg: "var(--yellow-faint)",
       titulo: "PIN de segurança",
-      desc: "Código de 6 dígitos exigido em operações sensíveis como saques.",
-      btn: "Configurar PIN",
+      desc: has_pin ? "PIN ativo. Altere quando quiser (4 dígitos)." : "Código de 4 dígitos exigido em saques e operações sensíveis.",
+      btn: has_pin ? "Alterar PIN" : "Configurar PIN",
+      badge: has_pin ? <span className="badge badge-green" style={{ fontSize: 11 }}><CheckCircle2 size={10} /> Ativo</span> : null,
     },
     {
       id: "sessoes",
@@ -231,9 +283,13 @@ export function Seguranca() {
       {modal === "senha" && (
         <Modal titulo="Alterar senha" subtitulo="Use uma senha forte com letras, números e símbolos." onClose={fechar}
           footer={<>
-            <button className="btn btn-ghost btn-sm" onClick={fechar}>Cancelar</button>
-            <button className="btn btn-primary btn-sm" style={{ gap: 6 }} disabled={!senhaOk}>
-              <Shield size={13} /> Atualizar senha
+            <button className="btn btn-ghost btn-sm" onClick={fechar} disabled={senhaLoading}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" style={{ gap: 6 }} disabled={!senhaOk || senhaLoading} onClick={handleSalvarSenha}>
+              {senhaLoading
+                ? <><Loader2 size={13} className="spin" /> Salvando...</>
+                : senhaSalva
+                  ? <><CheckCircle2 size={13} /> Senha alterada!</>
+                  : <><Shield size={13} /> Atualizar senha</>}
             </button>
           </>}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -243,6 +299,11 @@ export function Seguranca() {
             {senhas.nova && senhas.confirm && senhas.nova !== senhas.confirm && (
               <p style={{ fontSize: 12, color: "var(--red)", display: "flex", alignItems: "center", gap: 4 }}>
                 <AlertCircle size={12} /> As senhas não coincidem.
+              </p>
+            )}
+            {senhaErr && (
+              <p style={{ fontSize: 12, color: "var(--red)", display: "flex", alignItems: "center", gap: 4 }}>
+                <AlertCircle size={12} /> {senhaErr}
               </p>
             )}
           </div>
@@ -290,41 +351,35 @@ export function Seguranca() {
 
       {/* ── Modal: PIN ───────────────────────────────────────── */}
       {modal === "pin" && (
-        <Modal titulo="PIN de segurança" subtitulo="Escolha 6 dígitos numéricos. Será exigido em saques e operações sensíveis." onClose={fechar}
+        <Modal titulo={has_pin ? "Alterar PIN" : "PIN de segurança"} subtitulo="4 dígitos numéricos. Exigido em saques." onClose={fechar}
           footer={<>
             <button className="btn btn-ghost btn-sm" onClick={fechar}>Cancelar</button>
             <button className="btn btn-primary btn-sm" style={{ gap: 6 }}
-              disabled={!pinOk} onClick={handleSalvarPin}>
-              {pinSalvo ? <><CheckCircle2 size={13} /> PIN salvo!</> : <><KeyRound size={13} /> Salvar PIN</>}
+              disabled={(has_pin ? !pinAlterarOk : !pinOk) || pinLoading} onClick={handleSalvarPin}>
+              {pinLoading ? <><Loader2 size={13} className="spin" /> Salvando...</> : pinSalvo ? <><CheckCircle2 size={13} /> PIN salvo!</> : <><KeyRound size={13} /> Salvar PIN</>}
             </button>
           </>}>
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
+            {pinError && <p className="field-error">{pinError}</p>}
+            {has_pin && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+                <PinBoxes size={PIN_LEN} label="PIN atual" value={pinAtual} onChange={setPinAtual} />
+              </div>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
-              <PinBoxes label="Criar PIN" value={pin} onChange={setPin} />
+              <PinBoxes size={PIN_LEN} label={has_pin ? "Novo PIN" : "Criar PIN"} value={pin} onChange={setPin} />
             </div>
-
             <div style={{ height: 1, background: "var(--border-2)" }} />
-
             <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
-              <PinBoxes
-                label="Confirmar PIN"
-                value={pinConf}
-                onChange={setPinConf}
-                error={pinConf.length === 6 && pin !== pinConf}
-              />
-              {pinConf.length === 6 && pin !== pinConf && (
-                <p style={{ fontSize: 12, color: "var(--red)", display: "flex", alignItems: "center", gap: 4 }}>
-                  <AlertCircle size={12} /> Os PINs não coincidem.
-                </p>
+              <PinBoxes size={PIN_LEN} label="Confirmar PIN" value={pinConf} onChange={setPinConf}
+                error={pinConf.length === PIN_LEN && pin !== pinConf} />
+              {pinConf.length === PIN_LEN && pin !== pinConf && (
+                <p style={{ fontSize: 12, color: "var(--red)", display: "flex", alignItems: "center", gap: 4 }}><AlertCircle size={12} /> Os PINs não coincidem.</p>
               )}
-              {pinConf.length === 6 && pin === pinConf && (
-                <p style={{ fontSize: 12, color: "var(--green)", display: "flex", alignItems: "center", gap: 4 }}>
-                  <CheckCircle2 size={12} /> PINs conferem!
-                </p>
+              {pinConf.length === PIN_LEN && pin === pinConf && (
+                <p style={{ fontSize: 12, color: "var(--green)", display: "flex", alignItems: "center", gap: 4 }}><CheckCircle2 size={12} /> PINs conferem!</p>
               )}
             </div>
-
           </div>
         </Modal>
       )}

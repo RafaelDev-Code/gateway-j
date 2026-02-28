@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 const DESKTOP_BP = 1024;
 const KEY = "gjj-sb-collapsed";
 
 export function Layout({ children }) {
+  const { unreadCount } = useNotifications();
   const [collapsed,  setCollapsed]  = useState(() => localStorage.getItem(KEY) === "true");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDesktop,  setIsDesktop]  = useState(window.innerWidth > DESKTOP_BP);
@@ -40,6 +42,7 @@ export function Layout({ children }) {
         onToggle={toggle}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        unreadCount={unreadCount}
       />
 
       {/* Toggle fora da sidebar — nunca cortado por overflow */}
@@ -55,7 +58,7 @@ export function Layout({ children }) {
       )}
 
       <div className={mainCls}>
-        <TopBar onMenuClick={() => setSidebarOpen(true)} />
+        <TopBar onMenuClick={() => setSidebarOpen(true)} unreadCount={unreadCount} />
         <main className="page-content">
           {children}
         </main>

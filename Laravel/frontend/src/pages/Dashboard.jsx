@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   TrendingUp, TrendingDown, Activity,
   ArrowUpRight, ArrowDownRight,
@@ -8,69 +8,12 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { apiJson } from "../api/client";
 
-/* ── Mock data ────────────────────────────────────────── */
-/* Movimentações por hora do dia (00h–23h) */
-const HOURS = [
-  { hora: "00h", transacoes: 4 },  { hora: "01h", transacoes: 2 },  { hora: "02h", transacoes: 1 },
-  { hora: "03h", transacoes: 0 },  { hora: "04h", transacoes: 1 },  { hora: "05h", transacoes: 3 },
-  { hora: "06h", transacoes: 8 },  { hora: "07h", transacoes: 12 }, { hora: "08h", transacoes: 18 },
-  { hora: "09h", transacoes: 22 },  { hora: "10h", transacoes: 28 }, { hora: "11h", transacoes: 31 },
-  { hora: "12h", transacoes: 25 },  { hora: "13h", transacoes: 30 }, { hora: "14h", transacoes: 35 },
-  { hora: "15h", transacoes: 29 },  { hora: "16h", transacoes: 26 }, { hora: "17h", transacoes: 24 },
-  { hora: "18h", transacoes: 19 },  { hora: "19h", transacoes: 14 }, { hora: "20h", transacoes: 11 },
-  { hora: "21h", transacoes: 9 },   { hora: "22h", transacoes: 6 },  { hora: "23h", transacoes: 3 },
-];
-
-/* Últimos 7 dias (um barra por dia) */
-const DATA_7D = [
-  { dia: "20/02", transacoes: 198 },
-  { dia: "21/02", transacoes: 215 },
-  { dia: "22/02", transacoes: 189 },
-  { dia: "23/02", transacoes: 174 },
-  { dia: "24/02", transacoes: 221 },
-  { dia: "25/02", transacoes: 243 },
-  { dia: "26/02", transacoes: 267 },
-];
-
-/* Últimos 30 dias (uma barra por dia, labels enxutos) */
-const DATA_30D = [
-  { dia: "D1",  transacoes: 180 }, { dia: "D2",  transacoes: 192 }, { dia: "D3",  transacoes: 205 },
-  { dia: "D4",  transacoes: 178 }, { dia: "D5",  transacoes: 220 }, { dia: "D6",  transacoes: 235 },
-  { dia: "D7",  transacoes: 198 }, { dia: "D8",  transacoes: 215 }, { dia: "D9",  transacoes: 189 },
-  { dia: "D10", transacoes: 240 }, { dia: "D11", transacoes: 252 }, { dia: "D12", transacoes: 228 },
-  { dia: "D13", transacoes: 195 }, { dia: "D14", transacoes: 210 }, { dia: "D15", transacoes: 245 },
-  { dia: "D16", transacoes: 230 }, { dia: "D17", transacoes: 218 }, { dia: "D18", transacoes: 198 },
-  { dia: "D19", transacoes: 225 }, { dia: "D20", transacoes: 198 }, { dia: "D21", transacoes: 215 },
-  { dia: "D22", transacoes: 189 }, { dia: "D23", transacoes: 174 }, { dia: "D24", transacoes: 221 },
-  { dia: "D25", transacoes: 243 }, { dia: "D26", transacoes: 267 }, { dia: "D27", transacoes: 255 },
-  { dia: "D28", transacoes: 238 }, { dia: "D29", transacoes: 242 }, { dia: "D30", transacoes: 260 },
-];
-
-const BAR_DATA = [
-  { mes: "Jan", entradas: 38, saidas: 18 },
-  { mes: "Fev", entradas: 42, saidas: 22 },
-  { mes: "Mar", entradas: 35, saidas: 14 },
-  { mes: "Abr", entradas: 55, saidas: 28 },
-  { mes: "Mai", entradas: 68, saidas: 32 },
-  { mes: "Jun", entradas: 61, saidas: 27 },
-  { mes: "Jul", entradas: 74, saidas: 35 },
-  { mes: "Ago", entradas: 69, saidas: 30 },
-  { mes: "Set", entradas: 82, saidas: 40 },
-  { mes: "Out", entradas: 77, saidas: 36 },
-  { mes: "Nov", entradas: 91, saidas: 44 },
-  { mes: "Dez", entradas: 86, saidas: 38 },
-];
-
-/* Formas de conversão: só % e barras (sem valor em R$) */
-const FORMAS_CONVERSAO = [
-  { id: "pix",    label: "Pix",             pct: 67, barColor: "var(--accent)" },
-  { id: "cartao", label: "Cartão",          pct: 23, barColor: "var(--blue)" },
-  { id: "boleto", label: "Boleto",           pct: 10, barColor: "var(--green)" },
-  { id: "sep",    separator: true },
-  { id: "charge", label: "Chargebacks",      pct: 2,  barColor: "var(--yellow)" },
-  { id: "pre",    label: "Pre-chargebacks",  pct: 1,  barColor: "var(--red)" },
-];
+const TZ = "America/Sao_Paulo";
+function todayBR() { return new Date().toLocaleDateString("en-CA", { timeZone: TZ }); }
+function dateBR(iso) { return new Date(iso).toLocaleDateString("en-CA", { timeZone: TZ }); }
+function hourBR(iso) { return new Date(iso).toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", hour12: false }); }
 
 /* ── Custom Tooltip ───────────────────────────────────── */
 function ChartTipHour({ active, payload, label }) {
@@ -137,10 +80,10 @@ function KPI({ label, sublabel, value, delta, up, icon: Icon, iconBg, iconColor,
   );
 }
 
-/* ── Card Transações Hoje — só quantidade ────────────── */
-function KPITransacoesHoje({ delay, hidden }) {
-  const totais = { pix: 142, cartao: 48, boleto: 23 };
-  const total = totais.pix + totais.cartao + totais.boleto;
+/* ── Card Transações Hoje — por tipo (Depósito / Saque / Transferência) ────────────── */
+function KPITransacoesHoje({ delay, hidden, totais }) {
+  const t = totais || { DEPOSIT: 0, WITHDRAW: 0, INTERNAL_TRANSFER: 0 };
+  const total = (t.DEPOSIT ?? 0) + (t.WITHDRAW ?? 0) + (t.INTERNAL_TRANSFER ?? 0);
   return (
     <div className={`kpi-card kpi-card-transacoes-simple fade-up d${delay}`}>
       <div className="kpi-top">
@@ -156,9 +99,9 @@ function KPITransacoesHoje({ delay, hidden }) {
         {hidden ? "•••" : total.toLocaleString("pt-BR")}
       </div>
       <div className="kpi-qty-row">
-        <span>Pix <strong>{hidden ? "—" : totais.pix}</strong></span>
-        <span>Cartão <strong>{hidden ? "—" : totais.cartao}</strong></span>
-        <span>Boleto <strong>{hidden ? "—" : totais.boleto}</strong></span>
+        <span>Depósito <strong>{hidden ? "—" : (t.DEPOSIT ?? 0)}</strong></span>
+        <span>Saque <strong>{hidden ? "—" : (t.WITHDRAW ?? 0)}</strong></span>
+        <span>Transfer. <strong>{hidden ? "—" : (t.INTERNAL_TRANSFER ?? 0)}</strong></span>
       </div>
     </div>
   );
@@ -166,17 +109,93 @@ function KPITransacoesHoje({ delay, hidden }) {
 
 /* ── Main ─────────────────────────────────────────────── */
 export function Dashboard() {
-  const [chartPeriod, setChartPeriod] = useState("hoje"); // hoje | 7d | 30d
-  const [hidden,  setHidden]  = useState(false);
+  const [chartPeriod, setChartPeriod] = useState("hoje");
+  const [hidden, setHidden] = useState(false);
+  const [balanceData, setBalanceData] = useState(null);
+  const [transactionsList, setTransactionsList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const chartData = chartPeriod === "hoje" ? HOURS : chartPeriod === "7d" ? DATA_7D : DATA_30D;
-  const chartDataKey = chartPeriod === "hoje" ? "hora" : "dia";
+  useEffect(() => {
+    const today = todayBR();
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
+    const fromStr = from.toLocaleDateString("en-CA", { timeZone: TZ });
+    Promise.all([
+      apiJson("/balance").then((r) => (r?.data ? r : r)),
+      apiJson(`/transactions?from=${fromStr}&to=${today}`).then((r) => (Array.isArray(r?.data) ? r.data : r?.data ?? [])),
+    ])
+      .then(([bal, list]) => {
+        setBalanceData(bal?.data ?? bal ?? null);
+        setTransactionsList(Array.isArray(list) ? list : []);
+      })
+      .catch(() => { setBalanceData(null); setTransactionsList([]); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const { chartData, chartDataKey, entradasHoje, totaisHojePorTipo, formasConversao } = useMemo(() => {
+    const today = todayBR();
+    const list = transactionsList.filter((t) => dateBR(t.created_at) === today);
+    const all = transactionsList;
+    const entradasHoje = list
+      .filter((t) => t.type === "DEPOSIT")
+      .reduce((s, t) => s + parseFloat(t.amount || 0), 0);
+    const byType = { DEPOSIT: 0, WITHDRAW: 0, INTERNAL_TRANSFER: 0 };
+    list.forEach((t) => { if (byType[t.type] != null) byType[t.type]++; });
+    const totalByType = all.reduce((acc, t) => {
+      acc[t.type] = (acc[t.type] || 0) + 1;
+      return acc;
+    }, {});
+    const totalCount = all.length || 1;
+    const formasConversao = [
+      { id: "DEPOSIT", label: "Depósito", pct: Math.round(((totalByType.DEPOSIT || 0) / totalCount) * 100), barColor: "var(--accent)" },
+      { id: "WITHDRAW", label: "Saque", pct: Math.round(((totalByType.WITHDRAW || 0) / totalCount) * 100), barColor: "var(--blue)" },
+      { id: "INTERNAL_TRANSFER", label: "Transferência", pct: Math.round(((totalByType.INTERNAL_TRANSFER || 0) / totalCount) * 100), barColor: "var(--green)" },
+    ].filter((f) => f.pct > 0);
+    if (formasConversao.length === 0) formasConversao.push({ id: "none", label: "Nenhuma", pct: 100, barColor: "var(--text-3)" });
+
+    let chartData;
+    let chartDataKey;
+    if (chartPeriod === "hoje") {
+      const byHour = Array.from({ length: 24 }, (_, i) => ({ hora: `${String(i).padStart(2, "0")}h`, transacoes: 0 }));
+      list.forEach((t) => {
+        const h = new Date(t.created_at).toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", hour12: false });
+        const idx = parseInt(h, 10);
+        if (!isNaN(idx) && idx >= 0 && idx < 24) byHour[idx].transacoes++;
+      });
+      chartData = byHour;
+      chartDataKey = "hora";
+    } else {
+      const days = chartPeriod === "7d" ? 7 : 30;
+      const dayCount = {};
+      const start = new Date();
+      start.setDate(start.getDate() - days);
+      for (let i = 0; i < days; i++) {
+        const d = new Date(start);
+        d.setDate(d.getDate() + i);
+        const key = d.toLocaleDateString("en-CA", { timeZone: TZ });
+        dayCount[key] = { dia: d.toLocaleDateString("pt-BR", { timeZone: TZ, day: "2-digit", month: "2-digit" }), transacoes: 0 };
+      }
+      all.forEach((t) => {
+        const key = dateBR(t.created_at);
+        if (dayCount[key]) dayCount[key].transacoes++;
+      });
+      chartData = Object.keys(dayCount)
+        .sort()
+        .map((k) => dayCount[k]);
+      chartDataKey = "dia";
+    }
+    return { chartData, chartDataKey, entradasHoje, totaisHojePorTipo: byType, formasConversao };
+  }, [transactionsList, chartPeriod]);
+
   const chartSubtitle =
     chartPeriod === "hoje"
       ? "Transações por hora (00h às 23h59)"
       : chartPeriod === "7d"
       ? "Transações por dia — últimos 7 dias"
       : "Transações por dia — últimos 30 dias";
+
+  const saldo = balanceData?.balance != null ? Number(balanceData.balance) : 0;
+  const saldoFmt = loading ? "—" : `R$ ${saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="fade-in">
@@ -199,8 +218,8 @@ export function Dashboard() {
         <KPI
           label="Saldo Disponível"
           sublabel="Disponível para saque"
-          value="R$ 48.240,00"
-          delta="+8,2% este mês"
+          value={saldoFmt}
+          delta={balanceData?.cash_in_active ? "Recebimento ativo" : "—"}
           up={true}
           icon={Wallet}
           iconBg="var(--accent-faint)"
@@ -211,8 +230,8 @@ export function Dashboard() {
         <KPI
           label="Entradas Hoje"
           sublabel="Pagamentos recebidos"
-          value="R$ 12.350,00"
-          delta="+12,4% ontem"
+          value={loading ? "—" : `R$ ${entradasHoje.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          delta="—"
           up={true}
           icon={ArrowUpRight}
           iconBg="var(--green-faint)"
@@ -223,8 +242,8 @@ export function Dashboard() {
         <KPI
           label="Bloqueio Cautelar"
           sublabel="Meios para disputa"
-          value="R$ 3.200,00"
-          delta="2 contestações"
+          value="R$ 0,00"
+          delta="—"
           up={null}
           icon={ShieldAlert}
           iconBg="var(--yellow-faint)"
@@ -232,7 +251,7 @@ export function Dashboard() {
           delay={3}
           hidden={hidden}
         />
-        <KPITransacoesHoje delay={4} hidden={hidden} />
+        <KPITransacoesHoje delay={4} hidden={hidden} totais={totaisHojePorTipo} />
 
         {/* Linha 2: chart (3 colunas) + formas de conversão (1 coluna) */}
         <div className="dash-chart-col">
@@ -308,10 +327,7 @@ export function Dashboard() {
               <p className="card-title">Formas de conversão</p>
             </div>
             <div className="conv-bars conv-bars-full">
-              {FORMAS_CONVERSAO.map((item) =>
-                item.separator ? (
-                  <div key={item.id} className="conv-sep" />
-                ) : (
+              {(formasConversao && formasConversao.length ? formasConversao : [{ id: "none", label: "Nenhuma transação", pct: 0, barColor: "var(--text-3)" }]).map((item) => (
                   <div key={item.id} className="conv-bar-block">
                     <div className="conv-bar-header">
                       <span className="conv-bar-label">{item.label}</span>
@@ -320,12 +336,11 @@ export function Dashboard() {
                     <div className="conv-bar-track conv-bar-track-thick">
                       <div
                         className="conv-bar-fill"
-                        style={{ width: `${item.pct}%`, background: item.barColor }}
+                        style={{ width: `${Math.min(100, item.pct)}%`, background: item.barColor }}
                       />
                     </div>
                   </div>
-                )
-              )}
+                ))}
             </div>
           </div>
         </div>

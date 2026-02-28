@@ -9,11 +9,18 @@ use Symfony\Component\HttpFoundation\Response;
 class SanitizeInput
 {
     /**
-     * Campos que NAO devem ser sanitizados (ex: senhas, tokens)
+     * Campos que NAO devem ser sanitizados (MEDIUM-22).
+     * Campos de senha/PIN podem conter caracteres especiais legítimos como <, >, & e ;.
+     * strip_tags neles quebraria senhas com esses caracteres.
      */
     protected array $except = [
         'password',
+        'password_confirmation',
+        'current_password',
+        'new_password',
         'pin',
+        'pin_confirmation',
+        'current_pin',
         'client_secret',
         'token',
     ];

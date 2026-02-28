@@ -5,136 +5,31 @@ import {
 } from "lucide-react";
 import { Paginacao } from "../../components/Paginacao";
 import logoImg from "../../assets/logo.webp";
+import { apiJson } from "../../api/client";
+import { formatDateTimeBR } from "../../utils/date";
 
-/* ─── Dados de transações ───────────────────────────────────── */
-const TXS = [
-  {
-    id: "TXN-8821", tipo: "Pix",    cliente: "Loja ABC",     valor: 1_240.00, status: "aprovado",
-    data: "26/02/2026 14:32:01",
-    pagador: { nome: "João Silva",      cpfCnpj: "123.456.789-09", telegram: "@joaosilva"   },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "46.872.831/0001-54" },
-    autenticacao: "E60746948202602270652A144730gSQk",
-    identificacao: "b61aa8413cabfc6b01c3mm4jb2yk1ab2",
-    geradoEm: "26/02/2026 14:30:15",
-  },
-  {
-    id: "TXN-8820", tipo: "Cartão", cliente: "Tech Store",   valor: 890.50,   status: "aprovado",
-    data: "26/02/2026 14:28:44",
-    pagador: { nome: "Ana Souza",       cpfCnpj: "987.654.321-00", telegram: "@anasouza"    },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "—" },
-    autenticacao: "C50736848202602270631B233620fTRk",
-    identificacao: "a50bb7302daceb5a00b2ll3ib1xk0ba1",
-    geradoEm: "26/02/2026 14:26:10",
-  },
-  {
-    id: "TXN-8819", tipo: "Boleto", cliente: "Serviços XYZ", valor: 2_100.00, status: "pendente",
-    data: "26/02/2026 13:15:22",
-    pagador: { nome: "Carlos Lima",     cpfCnpj: "111.222.333-44", telegram: "@carloslima"  },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "—" },
-    autenticacao: "D40625737202602270520A022510eSPj",
-    identificacao: "c72cc9524ebdfd7b12d4nn5kc3zl2cd3",
-    geradoEm: "26/02/2026 13:13:05",
-  },
-  {
-    id: "TXN-8818", tipo: "Pix",    cliente: "Cliente A",    valor: 156.90,   status: "falhou",
-    data: "26/02/2026 12:58:33",
-    pagador: { nome: "Mariana Costa",   cpfCnpj: "555.666.777-88", telegram: "@marianac"    },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "46.872.831/0001-54" },
-    autenticacao: "F71857059202602261149C355641hUQl",
-    identificacao: "d83dd0635fcegh8c23e5oo6ld4am3de4",
-    geradoEm: "26/02/2026 12:56:00",
-  },
-  {
-    id: "TXN-8817", tipo: "Cartão", cliente: "Loja ABC",     valor: 445.00,   status: "estornado",
-    data: "26/02/2026 11:22:11",
-    pagador: { nome: "João Silva",      cpfCnpj: "123.456.789-09", telegram: "@joaosilva"   },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "—" },
-    autenticacao: "G82968160202602261038D466752iVRm",
-    identificacao: "e94ee1746gdfhi9d34f6pp7me5bn4ef5",
-    geradoEm: "26/02/2026 11:20:05",
-  },
-  {
-    id: "TXN-8816", tipo: "Pix",    cliente: "Tech Store",   valor: 3_780.00, status: "aprovado",
-    data: "26/02/2026 10:41:55",
-    pagador: { nome: "Pedro Alves",     cpfCnpj: "222.333.444-55", telegram: "@pedroalves"  },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "46.872.831/0001-54" },
-    autenticacao: "H93079271202602260927E577863jWQn",
-    identificacao: "f05ff2857hfgij0e45g7qq8nf6co5fg6",
-    geradoEm: "26/02/2026 10:39:30",
-  },
-  {
-    id: "TXN-8815", tipo: "Boleto", cliente: "Empresa Z",    valor: 5_000.00, status: "pendente",
-    data: "26/02/2026 09:10:48",
-    pagador: { nome: "Empresa Z LTDA",  cpfCnpj: "12.345.678/0001-99", telegram: "—"        },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "—" },
-    autenticacao: "I04180382202602260816F688974kXRo",
-    identificacao: "g16gg3968igghjk1f56h8rr9og7dp6gh7",
-    geradoEm: "26/02/2026 09:08:12",
-  },
-  {
-    id: "TXN-8814", tipo: "Pix",    cliente: "Cliente B",    valor: 320.00,   status: "aprovado",
-    data: "26/02/2026 08:47:20",
-    pagador: { nome: "Luciana Ferreira", cpfCnpj: "333.444.555-66", telegram: "@lucianaF"   },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "46.872.831/0001-54" },
-    autenticacao: "J15291493202602260705G799085lYQp",
-    identificacao: "h27hh4079jhhikl2g67i9ss0ph8eq7hi8",
-    geradoEm: "26/02/2026 08:45:00",
-  },
-  {
-    id: "TXN-8813", tipo: "Cartão", cliente: "Empresa W",    valor: 980.00,   status: "aprovado",
-    data: "25/02/2026 18:10:09",
-    pagador: { nome: "Empresa W LTDA",  cpfCnpj: "98.765.432/0001-11", telegram: "—"        },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "—" },
-    autenticacao: "K26302504202602251594H800196mZRq",
-    identificacao: "i38ii5180kiijlm3h78j0tt1qi9fr8ij9",
-    geradoEm: "25/02/2026 18:08:22",
-  },
-  {
-    id: "TXN-8812", tipo: "Pix",    cliente: "Cliente C",    valor: 2_450.00, status: "aprovado",
-    data: "25/02/2026 15:30:33",
-    pagador: { nome: "Roberto Gomes",   cpfCnpj: "444.555.666-77", telegram: "@robertog"    },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "46.872.831/0001-54" },
-    autenticacao: "L37413615202602251483I911207nAQr",
-    identificacao: "j49jj6291ljjkmn4i89k1uu2rj0gs9jk0",
-    geradoEm: "25/02/2026 15:28:10",
-  },
-  {
-    id: "TXN-8811", tipo: "Boleto", cliente: "Loja XYZ",     valor: 670.00,   status: "pendente",
-    data: "25/02/2026 12:00:15",
-    pagador: { nome: "Loja XYZ ME",     cpfCnpj: "55.666.777/0001-22", telegram: "—"        },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "—" },
-    autenticacao: "M48524726202602251372J022318oBRs",
-    identificacao: "k50kk7302mkkno5j90l2vv3sk1ht0kl1",
-    geradoEm: "25/02/2026 11:58:00",
-  },
-  {
-    id: "TXN-8810", tipo: "Pix",    cliente: "Tech Store",   valor: 1_100.00, status: "falhou",
-    data: "25/02/2026 09:45:50",
-    pagador: { nome: "Ana Souza",       cpfCnpj: "987.654.321-00", telegram: "@anasouza"    },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "46.872.831/0001-54" },
-    autenticacao: "N59635837202602251261K133429pCQT",
-    identificacao: "l61ll8413nllop6k01m3ww4tl2iu1lm2",
-    geradoEm: "25/02/2026 09:43:30",
-  },
-  {
-    id: "TXN-8809", tipo: "Cartão", cliente: "Cliente D",    valor: 3_200.00, status: "aprovado",
-    data: "24/02/2026 17:22:44",
-    pagador: { nome: "Fernanda Reis",   cpfCnpj: "666.777.888-99", telegram: "@fernandar"   },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "—" },
-    autenticacao: "O60746948202602241150L244530qDRU",
-    identificacao: "m72mm9524ommpq7l12n4xx5um3jv2mn3",
-    geradoEm: "24/02/2026 17:20:15",
-  },
-  {
-    id: "TXN-8808", tipo: "Pix",    cliente: "Empresa A",    valor: 550.00,   status: "estornado",
-    data: "24/02/2026 14:08:12",
-    pagador: { nome: "Empresa A LTDA",  cpfCnpj: "11.222.333/0001-44", telegram: "—"        },
-    recebedor: { nome: "GATEWAY JJ PAGAMENTOS LTDA", cpfCnpj: "46.872.831/0001-54", instituicao: "GATEWAY JJ PAGAMENTOS LTDA", chavePix: "46.872.831/0001-54" },
-    autenticacao: "P71857059202602241039M355641rERV",
-    identificacao: "n83nn0635pnnqr8m23o5yy6vn4kw3no4",
-    geradoEm: "24/02/2026 14:06:00",
-  },
-];
+/* Mapeia status da API para o usado na UI */
+const API_STATUS_MAP = { PAID: "aprovado", PENDING: "pendente", CANCELLED: "falhou", REVERSED: "estornado" };
+function mapApiTxToRow(api) {
+  const status = API_STATUS_MAP[api.status] ?? "pendente";
+  const data = formatDateTimeBR(api.created_at);
+  return {
+    id: String(api.id),
+    tipo: api.type_label ?? api.type ?? "—",
+    cliente: api.nome ?? api.descricao ?? "—",
+    valor: parseFloat(api.amount) || 0,
+    status,
+    data,
+    nome: api.nome,
+    descricao: api.descricao,
+    created_at: api.created_at,
+    pagador: { nome: api.nome ?? "—", cpfCnpj: "—", telegram: "—" },
+    recebedor: { nome: "—", cpfCnpj: "—", instituicao: "—", chavePix: "—" },
+    autenticacao: String(api.id),
+    identificacao: api.id ?? "—",
+    geradoEm: data,
+  };
+}
 
 const STATUS = {
   aprovado:  { label: "Aprovado",  cls: "badge-green",  icon: CheckCircle2 },
@@ -144,7 +39,7 @@ const STATUS = {
 };
 
 const fmt = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
-const PER_PAGE = 7;
+const PER_PAGE = 50;
 
 /* ─── Gera o HTML do comprovante para impressão/PDF ─────────── */
 function gerarHTMLComprovante(tx) {
@@ -453,25 +348,43 @@ function MenuAcoes({ tx, onComprovante }) {
   );
 }
 
+const STATUS_API_MAP = { todos: "", aprovado: "PAID", pendente: "PENDING", falhou: "CANCELLED", estornado: "REVERSED" };
+
 /* ─── Página principal ──────────────────────────────────────── */
 export function Transacoes() {
-  const [q,            setQ]            = useState("");
+  const [q, setQ] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
-  const [pagina,       setPagina]       = useState(1);
+  const [pagina, setPagina] = useState(1);
   const [txComprovante, setTxComprovante] = useState(null);
+  const [list, setList] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [lastPage, setLastPage] = useState(1);
+  const [loading, setLoading] = useState(true);
 
-  const filtrada = TXS.filter((tx) => {
-    const matchQ = q === "" || tx.id.toLowerCase().includes(q.toLowerCase()) || tx.cliente.toLowerCase().includes(q.toLowerCase());
-    const matchS = filtroStatus === "todos" || tx.status === filtroStatus;
-    return matchQ && matchS;
-  });
+  useEffect(() => {
+    const statusParam = STATUS_API_MAP[filtroStatus] || "";
+    const url = statusParam ? `/transactions?page=${pagina}&status=${statusParam}` : `/transactions?page=${pagina}`;
+    setLoading(true);
+    apiJson(url)
+      .then((r) => {
+        const data = Array.isArray(r?.data) ? r.data : r?.data ?? [];
+        setList(data.map(mapApiTxToRow));
+        setTotal(r?.meta?.total ?? data.length);
+        setLastPage(r?.meta?.last_page ?? 1);
+      })
+      .catch(() => { setList([]); setTotal(0); setLastPage(1); })
+      .finally(() => setLoading(false));
+  }, [pagina, filtroStatus]);
 
-  const totalPags  = Math.max(1, Math.ceil(filtrada.length / PER_PAGE));
+  const filtrada = list.filter((tx) =>
+    q === "" || tx.id.toLowerCase().includes(q.toLowerCase()) || (tx.cliente || "").toLowerCase().includes(q.toLowerCase())
+  );
+  const totalPags = Math.max(1, lastPage);
   const paginaReal = Math.min(pagina, totalPags);
-  const lista      = filtrada.slice((paginaReal - 1) * PER_PAGE, paginaReal * PER_PAGE);
+  const lista = filtrada;
 
   const onFiltro = (s) => { setFiltroStatus(s); setPagina(1); };
-  const onBusca  = (v) => { setQ(v); setPagina(1); };
+  const onBusca = (v) => setQ(v);
 
   return (
     <div>
@@ -527,7 +440,13 @@ export function Transacoes() {
               </tr>
             </thead>
             <tbody>
-              {lista.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: "28px", color: "var(--text-3)" }}>
+                    Carregando...
+                  </td>
+                </tr>
+              ) : lista.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: "center", padding: "28px", color: "var(--text-3)" }}>
                     Nenhuma transação encontrada.
@@ -556,7 +475,7 @@ export function Transacoes() {
           </table>
         </div>
 
-        <Paginacao total={filtrada.length} porPagina={PER_PAGE} pagina={paginaReal} onChange={setPagina} />
+        <Paginacao total={total} porPagina={PER_PAGE} pagina={paginaReal} onChange={setPagina} />
       </div>
 
       {txComprovante && (

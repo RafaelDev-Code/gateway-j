@@ -16,7 +16,7 @@ class IntegrationKeyResource extends Resource
     protected static ?string $navigationIcon  = 'heroicon-o-key';
     protected static ?string $navigationLabel = 'Chaves de API';
     protected static ?string $modelLabel      = 'Chave de API';
-    protected static ?int $navigationSort     = 3;
+    protected static ?int $navigationSort      = 22;
 
     public static function form(Form $form): Form
     {
